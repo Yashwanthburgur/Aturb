@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Local machine config (paths and keys)
+aturb.local.toml
+
+# Build products (any folder named out)
+out/
+
+# FreeCAD backup files
+*.FCStd1
+*.FCBak
+
+# Eval scratch space
+evals/tmp/
+
+# OS clutter
+Thumbs.db
+.DS_Store
