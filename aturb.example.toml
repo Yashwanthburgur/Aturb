@@ -1,0 +1,11 @@
+# Copy this file to aturb.local.toml (gitignored) and fill in values for your machine.
+active_pack = "freecad"
+
+[packs.freecad]
+# Full path to FreeCAD's command-line executable. See docs/ENVIRONMENT.md.
+cmd = ""
+
+[packs.stub]
+
+[timeouts]
+build_s = 60  # starting default
