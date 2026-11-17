@@ -32,4 +32,16 @@ def build(doc):
     pad = body.newObject("PartDesign::Pad", "Pad")
     pad.Profile = sk
     pad.Length = THICKNESS_MM
+
+    # Two through-holes (T1.21)
+    hs = body.newObject("Sketcher::SketchObject", "HoleSketch")
+    hs.Placement = App.Placement(App.Vector(
+        0, 0, THICKNESS_MM), App.Rotation())
+    for x in (-HOLE_PITCH_MM / 2, HOLE_PITCH_MM / 2):
+        hs.addGeometry(Part.Circle(App.Vector(x, 0, 0),
+                       App.Vector(0, 0, 1), HOLE_DIA_MM / 2), False)
+    pocket = body.newObject("PartDesign::Pocket", "Holes")
+    pocket.Profile = hs
+    pocket.Type = "ThroughAll"
+
     return body
