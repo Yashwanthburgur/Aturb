@@ -1,0 +1,6 @@
+name = "freecad"
+language = "python-freecad"
+part_extension = ".py"
+runner = "packs.freecad.runner:FreeCADRunner"
+prompt_dir = "prompt"
+contract_version = "0.1"
