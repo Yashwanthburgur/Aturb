@@ -5,8 +5,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run pytest -m "not freecad" -q
       - run: uv run python tools/size_limit.py
+      - run: uv run python tools/agnostic_lint.py
