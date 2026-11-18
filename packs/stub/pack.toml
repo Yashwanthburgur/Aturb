@@ -1,0 +1,6 @@
+name = "stub"
+language = "stub-text"
+part_extension = ".stub"
+runner = "packs.stub.runner:StubRunner"
+prompt_dir = "prompt"
+contract_version = "0.1"
