@@ -2,11 +2,16 @@
 
 ## Operating system
 
-Not yet verified.
+Microsoft Windows 11 Home Single Language
+
+Recorded with `(Get-CimInstance Win32_OperatingSystem).Caption`.
 
 ## Tools (git, uv, Python)
 
-Not yet verified.
+- Git: `git version 2.47.1.windows.1` (from `git --version`)
+- uv: `uv 0.12.6 (7938ca5d5 2026-08-25 x86_64-pc-windows-msvc)` (from `uv --version`)
+- Python: `Python 3.12.1` (from `uv run python --version`; this is the pinned version in
+  `.python-version`, and `pyproject.toml` allows `>=3.11,<3.13`)
 
 ## FreeCAD
 
@@ -75,7 +80,42 @@ stderr line is the only evidence an exception happened.
 
 ## Timeouts and killing processes
 
-Not yet verified.
+Verified in T1.28. The runner (`tools/spikes/run_fc.py`) starts the CAD executable with
+`subprocess.Popen` and waits with `proc.communicate(timeout=<seconds>)`. `communicate`
+drains stdout and stderr while it waits, so a script that writes more output than a pipe
+buffer holds cannot deadlock the runner. When the timeout expires, the whole process tree
+is killed with Windows `taskkill`:
+
+```
+subprocess.run(
+    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+    capture_output=True,
+    timeout=KILL_GRACE_S,
+)
+```
+
+- `/T` kills the child processes the CAD process started, not just the process itself.
+- `/F` forces termination; no graceful shutdown is attempted.
+- The `taskkill` result is checked. If it fails or is unavailable, the runner falls back to
+  killing the direct child with `proc.kill()`.
+- Every cleanup wait is bounded by `KILL_GRACE_S` (10 s, a starting default), so cleanup
+  can never hang.
+- The child is reaped and the pipes are released before the runner returns.
+- After the kill, the runner prints `TIMEOUT` and exits with code **3**. Cleanup never
+  changes that outcome.
+
+Observed with `tools/spikes/fc_loop.py` (contents: `while True: pass`):
+
+```
+uv run python tools/spikes/run_fc.py tools/spikes/fc_loop.py --timeout 5
+```
+
+Output: `TIMEOUT`, exit code `3`. The follow-up check
+`Get-Process | Where-Object { $_.ProcessName -like "*freecad*" }` printed nothing, so no
+FreeCAD process survived the timeout.
+
+Note: a FreeCAD GUI window must be closed before this test, otherwise the pre-existing GUI
+process shows up in the process list and masks the result.
 
 ## PartDesign headless findings
 
@@ -159,3 +199,45 @@ All features `['Up-to-date']`. STEP exported successfully (248 entities).
 Cleanup: Deleted `tools/spikes/my project` folder. Verification: `Test-Path "tools\spikes\my project"` → `False`.
 
 Conclusion: **Builds work correctly with spaces in the project path**. Environment variables must be quoted when passed to the harness.
+
+## Reproduce from scratch
+
+Follow these steps on a clean Windows machine to get the same working environment.
+
+1. Install Git for Windows from <https://git-scm.com/download/win>, and confirm it is on
+   `PATH` with `git --version`.
+2. Install uv from <https://docs.astral.sh/uv/getting-started/installation/> (on Windows:
+   `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`),
+   and confirm it with `uv --version`.
+3. Clone the repository:
+   `git clone https://github.com/yashwanthburgur/Aturb.git` then `cd Aturb`.
+4. Create the environment and install the pinned Python and all dependencies:
+   `uv sync`.
+5. Install FreeCAD for Windows (the latest stable release, not a weekly build) from
+   <https://www.freecad.org/downloads.php>, and open the GUI once to confirm it works.
+   Find the command-line executable with:
+
+   ```powershell
+   Get-ChildItem "C:\Program Files" -Directory -Filter "FreeCAD*" | ForEach-Object { Get-ChildItem $_.FullName -Recurse -Filter "*cmd*.exe" -ErrorAction SilentlyContinue } | Select-Object FullName
+   ```
+
+6. Copy the config template to the gitignored local config and set the FreeCAD command:
+
+   ```powershell
+   Copy-Item aturb.example.toml aturb.local.toml
+   ```
+
+   Then edit `aturb.local.toml` and set the `cmd` value under `[packs.freecad]` to the full
+   path found in step 5, for example
+   `cmd = "C:/Program Files/FreeCAD 1.0/bin/freecadcmd.exe"`. Use forward slashes or
+   doubled backslashes inside the TOML string. `aturb.local.toml` is gitignored and never
+   committed.
+
+7. Run the full test suite:
+
+   ```powershell
+   uv run pytest -q
+   ```
+
+   The FreeCAD-marked tests need the `cmd` path from step 6 to be correct. To run only the
+   tests that do not need FreeCAD, use `uv run pytest -m "not freecad" -q`.
