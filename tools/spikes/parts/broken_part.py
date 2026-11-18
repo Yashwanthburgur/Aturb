@@ -1,7 +1,5 @@
 """Broken part: Pad on an empty sketch (should fail to recompute)."""
 
-import FreeCAD as App
-import Part
 
 
 def build(doc):

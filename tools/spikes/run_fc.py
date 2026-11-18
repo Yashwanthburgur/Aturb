@@ -18,6 +18,7 @@ from pathlib import Path
 from aturb.config import ConfigError, load_config, pack_settings
 
 DEFAULT_TIMEOUT_S = 120  # starting default
+KILL_GRACE_S = 10  # starting default
 PACK_NAME = "freecad"
 
 # Exit codes used by this script.
@@ -59,6 +60,45 @@ def _resolve_command() -> str:
     return command
 
 
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill a child process and everything it started, then release its pipes.
+
+    Every wait here is bounded, so cleanup can never hang. This runs only after a
+    timeout, and it never changes the timeout outcome; it just makes sure no
+    process and no pipe is left behind.
+    """
+    tree_killed = False
+    try:
+        result = subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            capture_output=True,
+            timeout=KILL_GRACE_S,
+        )
+        tree_killed = result.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        tree_killed = False
+
+    if not tree_killed:
+        # Fallback when taskkill is unavailable or failed: kill the direct child.
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+    # Reap the child and release the pipes, with a bounded wait.
+    try:
+        proc.communicate(timeout=KILL_GRACE_S)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+        except OSError:
+            pass
+        try:
+            proc.communicate(timeout=KILL_GRACE_S)
+        except subprocess.TimeoutExpired:
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a script inside headless FreeCAD and show its output.",
@@ -87,25 +127,27 @@ def main(argv: list[str] | None = None) -> int:
     child_env = os.environ.copy()
     child_env.update(extra_env)
 
+    proc = subprocess.Popen(
+        [command, str(script_path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=str(REPO_ROOT),
+        env=child_env,
+    )
     try:
-        completed = subprocess.run(
-            [command, str(script_path)],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT),
-            env=child_env,
-            timeout=args.timeout,
-        )
+        stdout, stderr = proc.communicate(timeout=args.timeout)
     except subprocess.TimeoutExpired:
+        _kill_tree(proc)
         print("TIMEOUT")
         return EXIT_TIMEOUT
 
-    print(f"EXIT: {completed.returncode}")
+    print(f"EXIT: {proc.returncode}")
     print("--- STDOUT ---")
-    print(completed.stdout, end="")
+    print(stdout, end="")
     print("--- STDERR ---")
-    print(completed.stderr, end="")
-    return completed.returncode
+    print(stderr, end="")
+    return proc.returncode
 
 
 if __name__ == "__main__":

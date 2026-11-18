@@ -3,7 +3,6 @@
 import FreeCAD as App
 import Part
 
-
 # --- PARAMS (copied from plt0001_base_plate.py) ---
 LENGTH_MM = 120.0       # along X
 WIDTH_MM = 60.0         # along Y
