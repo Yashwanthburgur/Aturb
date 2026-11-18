@@ -4,21 +4,23 @@ Verified against build123d 0.13.0 on 2026-11-11, installed with Python 3.12 via 
 All rows below were executed on this machine; nothing is copied from upstream documentation.
 Re-verify after any version bump in `pyproject.toml`.
 
-| Call                                       | Purpose                                    | Verified output                                                         |
-| ------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------- |
-| `Box(10, 10, 10)`                          | Create a 10 x 10 x 10 box                  | `volume = 999.9999999999998`, `is_valid = True`                         |
-| `Cylinder(radius, height)`                 | Create a cylinder solid                    | `Cylinder(5, 20)` -> volume `1570.7963267948965` (pi*r^2*h)             |
-| `Box(10, 10, 10).center()`                 | Centre of mass point                       | `Pos(3, 0, 0) * box` -> `Vector: (X=18, Y=0, Z=0)`                      |
-| `shape.locate(Location((15, 0, 0)))`       | Position geometry by translation           | `located.center()` -> `Vector: (X=15, Y=0, Z=0)`                        |
-| `shape.moved(Location((0,0,0), (0,0,45)))` | Position geometry by rotation              | `rotated.bounding_box().size` -> `Vector: (X=14.1421, Y=14.1421, Z=10)` |
-| `box - cyl`                                | Subtract one solid from another (operator) | `1000 - 392.699` overlap cut -> volume `803.650459`, `is_valid = True`  |
-| `box.cut(cyl)`                             | Subtract one solid from another (method)   | volume `803.650459`                                                     |
-| `export_step(shape, path)`                 | Export a solid to STEP                     | returns `True`, file written and present on disk                        |
-| `import_step(path)`                        | Import a STEP file                         | returns `Solid`, `solids()` length `1`, volume `999.9999999999998`      |
-| `shape.volume`                             | Read volume                                | `Box(10, 10, 10)` -> `999.9999999999998`                                |
-| `shape.bounding_box()`                     | Read bounding box                          | `BoundBox: bbox: -5.0 <= x <= 5.0, -5.0 <= y <= 5.0, -5.0 <= z <= 5.0`  |
-| `BoundBox.size`                            | Read bounding-box dimensions               | `Vector: (X=10, Y=10, Z=10)`                                            |
-| `shape.is_valid`                           | Check geometry validity                    | `True`                                                                  |
+| Call                                             | Purpose                                    | Verified output                                                             |
+| ------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------- |
+| `Box(10, 10, 10)`                                | Create a 10 x 10 x 10 box                  | `volume = 999.9999999999998`, `is_valid = True`                             |
+| `Cylinder(radius, height)`                       | Create a cylinder solid                    | `Cylinder(5, 20)` -> volume `1570.7963267948965` (pi*r^2*h)                 |
+| `Box(10, 10, 10).center()`                       | Centre of mass point                       | `Pos(3, 0, 0) * box` -> `Vector: (X=18, Y=0, Z=0)`                          |
+| `shape.locate(Location((15, 0, 0)))`             | Position geometry by translation           | `located.center()` -> `Vector: (X=15, Y=0, Z=0)`                            |
+| `shape.moved(Location((0,0,0), (0,0,45)))`       | Position geometry by rotation              | `rotated.bounding_box().size` -> `Vector: (X=14.1421, Y=14.1421, Z=10)`     |
+| `box - cyl`                                      | Subtract one solid from another (operator) | `1000 - 392.699` overlap cut -> volume `803.650459`, `is_valid = True`      |
+| `box.cut(cyl)`                                   | Subtract one solid from another (method)   | volume `803.650459`                                                         |
+| `Cylinder(5, 5).locate(Location((x, 0, 0)))`     | Position a cylinder at a given X           | `locate(Location((-40, 0, 0)))` -> `center()` = `Vector: (X=-40, Y=0, Z=0)` |
+| `Box(120, 60, 5)` minus two positioned cylinders | Plate with two through-holes               | volume `35214.60183660256`, bbox `Vector: (X=120, Y=60, Z=5)`               |
+| `export_step(shape, path)`                       | Export a solid to STEP                     | returns `True`, file written and present on disk                            |
+| `import_step(path)`                              | Import a STEP file                         | returns `Solid`, `solids()` length `1`, volume `999.9999999999998`          |
+| `shape.volume`                                   | Read volume                                | `Box(10, 10, 10)` -> `999.9999999999998`                                    |
+| `shape.bounding_box()`                           | Read bounding box                          | `BoundBox: bbox: -5.0 <= x <= 5.0, -5.0 <= y <= 5.0, -5.0 <= z <= 5.0`      |
+| `BoundBox.size`                                  | Read bounding-box dimensions               | `Vector: (X=10, Y=10, Z=10)`                                                |
+| `shape.is_valid`                                 | Check geometry validity                    | `True`                                                                      |
 
 ## Notes from verification
 
