@@ -144,4 +144,18 @@ returned, passing the full output path:
 
 ## Paths with spaces
 
-Not yet verified.
+**T1.27 — Paths with spaces spike**: Copied `projects/demo/parts/plt0001_base_plate.py` to `tools/spikes/my project/parts/plt0001_base_plate.py` (note the space in the folder name). Built with the spike harness, output to `tools/spikes/my project/out`.
+
+Build command (environment variables quoted):
+
+```
+uv run python tools/spikes/run_fc.py tools/spikes/fc_build.py --env ATURB_PART="c:\Users\Yashwanth\OneDrive\Desktop\Aturb\tools\spikes\my project\parts\plt0001_base_plate.py" --env ATURB_OUT="c:\Users\Yashwanth\OneDrive\Desktop\Aturb\tools\spikes\my project\out"
+```
+
+RESULT: `{"status": "ok", "fcstd": "...\\tools\\spikes\\my project\\out\\plt0001_base_plate.FCStd", "step": "...\\tools\\spikes\\my project\\out\\plt0001_base_plate.step", "states": {...}}`
+
+All features `['Up-to-date']`. STEP exported successfully (248 entities).
+
+Cleanup: Deleted `tools/spikes/my project` folder. Verification: `Test-Path "tools\spikes\my project"` → `False`.
+
+Conclusion: **Builds work correctly with spaces in the project path**. Environment variables must be quoted when passed to the harness.
