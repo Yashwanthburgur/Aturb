@@ -97,6 +97,31 @@ Conclusion: **Two builds identical: yes**. Volume, surface area, all three bound
 
 > Note: The STEP files contain identical geometry. All measurements used calls already verified in docs/api_notes/build123d.md (import_step, solid.volume, solid.area, solid.faces(), solid.bounding_box().size, solid.is_valid).
 
+**T1.26 — Hole vs Pocket spike**: Tested `PartDesign::Hole` feature for simple through-holes in the demo plate.
+
+Hole feature properties verified via `dir()` (T1.26):
+
+- `Diameter` (Base.Quantity, default 6.0 mm)
+- `Depth` (Base.Quantity, default 25.0 mm)
+- `DepthType` (str, enum: "Dimension", "ThroughAll", "ToLast", "UpToFace", "UpToShape", "TwoSided")
+- `Profile` (accepts face reference tuple `(feature, "FaceN")` or sketch)
+- `Refine` (bool, default True)
+- `Tapered` (bool, default False)
+- Other thread-related properties (ThreadType, ThreadSize, etc.) not used.
+
+Build attempts:
+
+1.  Hole with sketch Profile (`hole1.Profile = hs`): **Failed** — "Linked shape object is empty"
+2.  Hole with face reference Profile (`hole1.Profile = (pad, "Face6")`), Diameter=10, DepthType="ThroughAll": **Builds OK** but **does not cut holes** (volume remains 36000 mm³, same as solid plate).
+3.  Single Hole with two circles in sketch: **Same result** — builds OK, volume 36000 mm³.
+
+For comparison, `PartDesign::Pocket` with same sketch cuts correctly: volume 35607.3 mm³ (one hole) → 35214.6 mm³ (two holes).
+
+Measured Hole volume: **36000.000 mm³** (no material removed).
+Expected volume (with holes): **35214.602 mm³**.
+
+Recommendation: **Use Pocket for simple through-holes**. Hole feature does not cut material in headless FreeCAD 1.0.1 with the tested configurations.
+
 ## STEP export
 
 Method that worked (T1.17): call `exportStep` on the shape of the object that `build(doc)`
