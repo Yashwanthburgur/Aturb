@@ -1,12 +1,17 @@
-"""FreeCAD test: build the demo plate and measure its STEP geometry with build123d."""
+"""FreeCAD test: build the demo plate through the real runner and measure its STEP."""
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
 
-from tests.fc_utils import run_spike_build
+from aturb.config import load_config
+from aturb.contract.types import BuildRequest
+from aturb.packs import default_packs_root, load_runner
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Hand calculation of the expected volume (plt0001_base_plate.py):
 #
@@ -15,22 +20,36 @@ from tests.fc_utils import run_spike_build
 #   Expected volume = 35214.602 mm^3.
 
 
+def make_runner():
+    """Load the production FreeCAD runner with the local config."""
+    cfg = load_config(REPO_ROOT / "aturb.local.toml")
+    return load_runner("freecad", cfg, default_packs_root())
+
+
 @pytest.mark.freecad
 def test_demo_plate_geometry(tmp_path):
     """Build the PLT0001 base plate and verify its volume and bounding box."""
-    repo_root = Path(__file__).resolve().parents[1]
-    part_path = repo_root / "projects" / "demo" / "parts" / "plt0001_base_plate.py"
-    out_dir = tmp_path / "out"
+    project = tmp_path / "proj"
+    shutil.copytree(
+        REPO_ROOT / "projects" / "demo",
+        project,
+        ignore=shutil.ignore_patterns("out"),
+    )
 
-    result = run_spike_build(part_path, out_dir)
+    runner = make_runner()
+    result = runner.build(BuildRequest(
+        project_root=str(project),
+        part_id="plt0001",
+        language=runner.info().language,
+    ))
 
-    assert result["status"] == "ok", f"Build failed: {result.get('error', 'unknown')}"
-    assert "step" in result, "No STEP artifact in result"
+    assert result.status == "ok", result.error_text
+    assert "step" in result.artifacts, "No STEP artifact in result"
 
     # Import STEP with build123d (only calls documented in docs/api_notes/build123d.md)
     from build123d import import_step
 
-    solid = import_step(result["step"])
+    solid = import_step(str(project / result.artifacts["step"]))
 
     # Assert volume is 35214.602 within 0.01
     assert abs(solid.volume - 35214.602) <= 0.01
