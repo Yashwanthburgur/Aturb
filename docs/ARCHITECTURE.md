@@ -26,6 +26,27 @@ The core never knows which CAD, language or front end is in use. It takes a requ
 
 The runner contract takes a build request and returns a result, and never exposes CAD operations. It is the only door to a CAD system, so the core never talks to a CAD application directly. Because the contract carries requests and results rather than geometry commands, it stays the same when the CAD changes.
 
+## Runner contract as built
+
+A runner is constructed as `RunnerClass(settings: dict, pack_dir: Path)` and has exactly
+two methods: `info()` returns a `PackInfo`, and `build(request)` returns a `BuildResult`.
+The types live in [`aturb/contract/types.py`](../aturb/contract/types.py). The eight
+failure kinds are `rejected_unsafe`, `syntax_error`, `runtime_error`, `timeout`,
+`invalid_geometry`, `export_failed`, `runner_crash` and `input_error`.
+
+A pack is found at `packs/<name>/pack.toml`, for example
+[`packs/freecad/pack.toml`](../packs/freecad/pack.toml). Its `runner` key is a
+`"module:Class"` string that is imported dynamically, and its `contract_version` is
+checked against the core's before the runner is constructed.
+
+The FreeCAD pack runs this sequence: a static precheck of the part file, then a
+`job.json` written into the project's output folder, then the CAD executable started as
+a subprocess on `harness/build_part.py`, then a `result.json` read back from the same
+folder, then artifact paths made relative to the project.
+
+The stub pack copies a packaged fixture STEP instead of building anything. It exists to
+prove that the core never needs a CAD.
+
 ## Backend pack
 
 A backend pack holds everything for one CAD: its language, its conventions, its prompt and its runner. FreeCAD is the first pack and others come later, one folder per CAD. Adding a CAD means adding a pack, not changing the core.
