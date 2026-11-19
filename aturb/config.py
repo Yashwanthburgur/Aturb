@@ -37,13 +37,18 @@ def load_config(path: Path | None = None) -> dict:
     Search order: the explicit ``path`` if given, then the file named by the
     ``ATURB_CONFIG`` environment variable, then ``aturb.local.toml`` in the current
     working directory. The first file that exists is used. If none exists, raise
-    ``ConfigError`` listing every location that was tried.
+    ``ConfigError`` listing every location that was tried. A file that is not
+    valid TOML also raises ``ConfigError``.
     """
     candidates = _candidate_paths(path)
     for candidate in candidates:
         if candidate.is_file():
-            with candidate.open("rb") as handle:
-                return tomllib.load(handle)
+            try:
+                with candidate.open("rb") as handle:
+                    return tomllib.load(handle)
+            except tomllib.TOMLDecodeError as exc:
+                raise ConfigError(
+                    f"invalid TOML in {candidate}: {exc}") from exc
     tried = ", ".join(str(candidate) for candidate in candidates)
     raise ConfigError(f"no configuration file found; tried: {tried}")
 

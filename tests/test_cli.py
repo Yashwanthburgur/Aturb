@@ -51,6 +51,20 @@ def test_scripted_failure(tmp_path, capsys):
     assert out.startswith("failed plt0001 timeout")
 
 
+def test_malformed_config_returns_2(tmp_path, capsys):
+    """A malformed config file prints a clean error and returns 2."""
+    config = tmp_path / "broken.toml"
+    config.write_text('active_pack = "stub\n', encoding="utf-8")
+    project = make_project(tmp_path)
+
+    code = main(["build", str(project), "plt0001", "--config", str(config)])
+
+    out = capsys.readouterr().out
+    assert code == 2
+    assert "invalid TOML" in out
+    assert "Traceback" not in out
+
+
 def test_missing_config_returns_2(tmp_path, capsys, monkeypatch):
     """A missing config file prints a message and returns 2."""
     monkeypatch.delenv("ATURB_CONFIG", raising=False)

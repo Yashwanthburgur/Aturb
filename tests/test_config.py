@@ -59,6 +59,19 @@ def test_missing_file_names_all_tried_locations(tmp_path, monkeypatch):
     assert "aturb.local.toml" in message
 
 
+def test_malformed_toml_raises_config_error(tmp_path):
+    """A file that is not valid TOML raises ConfigError, not TOMLDecodeError."""
+    cfg_file = tmp_path / "broken.toml"
+    cfg_file.write_text('active_pack = "example\n', encoding="utf-8")
+
+    with pytest.raises(ConfigError) as excinfo:
+        load_config(cfg_file)
+
+    message = str(excinfo.value)
+    assert str(cfg_file) in message
+    assert "invalid TOML" in message
+
+
 def test_active_pack_missing_raises():
     with pytest.raises(ConfigError):
         active_pack({})
