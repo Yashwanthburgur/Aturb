@@ -51,9 +51,11 @@ prove that the core never needs a CAD.
 
 A backend pack holds everything for one CAD: its language, its conventions, its prompt and its runner. FreeCAD is the first pack and others come later, one folder per CAD. Adding a CAD means adding a pack, not changing the core.
 
-## Neutral measuring
+## Neutral verification layer
 
-Checks run on exported STEP so they are the same for every CAD. The same neutral library measures the geometry whatever built it, so a check means the same thing in every pack. A CAD's own diagnostics are informational only and never decide whether a check passed.
+The neutral verification layer lives in the core, in [`aturb/verify/`](../aturb/verify/). It reads an exported STEP file with build123d and measures the geometry from it: the volume, the bounding box, the holes, the gaps and the material that two solids share. It never reads a CAD's own diagnostics, so a check means the same thing in every pack and a backend cannot pass a check by reporting its own success.
+
+The expected values of a part live in the project, in `expect/<part_id>.toml`, and hold numbers only. The layer turns them into check results, and `aturb check` runs them over the exported STEP.
 
 ## Two Python environments
 
