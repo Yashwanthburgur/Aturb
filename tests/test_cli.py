@@ -1,4 +1,8 @@
-"""Tests for the aturb build CLI using the stub pack."""
+"""Tests for the aturb build and aturb check CLI using the stub pack.
+
+The stub pack copies the committed fixture, so the checks of the demo plate
+run over that fixture without a CAD.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +13,7 @@ from aturb.cli import main
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFORMANCE_STUB = REPO_ROOT / "tests" / "fixtures" / "conformance" / "stub"
+DEMO_EXPECT = REPO_ROOT / "projects" / "demo" / "expect" / "plt0001.toml"
 
 
 def write_config(tmp_path: Path) -> Path:
@@ -29,6 +34,19 @@ def make_project(tmp_path: Path, part_text: str = "stub part file") -> Path:
         (project / "parts" / "plt0001_base_plate.stub").write_text(
             part_text, encoding="utf-8")
     return project
+
+
+def write_expectation(project: Path, text: str | None = None) -> None:
+    """Write the expected values of the part into the project.
+
+    The committed expectation file of the demo plate is used by default. The
+    stub pack builds the same plate, so the same expected values apply.
+    """
+    expect_dir = project / "expect"
+    expect_dir.mkdir(exist_ok=True)
+    if text is None:
+        text = DEMO_EXPECT.read_text(encoding="utf-8")
+    (expect_dir / "plt0001.toml").write_text(text, encoding="utf-8")
 
 
 def test_ok_build(tmp_path, capsys):
@@ -73,3 +91,52 @@ def test_missing_config_returns_2(tmp_path, capsys, monkeypatch):
     code = main(["build", str(project), "plt0001"])
     capsys.readouterr()
     assert code == 2
+
+
+def test_check_passes_on_the_fixture(tmp_path, capsys):
+    """Every check passes on the committed fixture and the command returns 0."""
+    project = make_project(tmp_path)
+    write_expectation(project)
+    code = main(["check", str(project), "plt0001",
+                 "--config", str(write_config(tmp_path))])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "check volume passed" in out
+    assert "check hole_count passed" in out
+    assert "failed" not in out
+
+
+def test_check_fails_on_a_wrong_expected_value(tmp_path, capsys):
+    """A wrong expected value fails one check and the command returns 1."""
+    project = make_project(tmp_path)
+    wrong = DEMO_EXPECT.read_text(encoding="utf-8").replace(
+        "volume = 35214.602", "volume = 1.0")
+    write_expectation(project, wrong)
+    code = main(["check", str(project), "plt0001",
+                 "--config", str(write_config(tmp_path))])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "check volume failed" in out
+    assert "check bbox_x passed" in out
+
+
+def test_check_without_an_expectation_file_returns_1(tmp_path, capsys):
+    """A part with no expected values has no check that can pass."""
+    project = make_project(tmp_path)
+    code = main(["check", str(project), "plt0001",
+                 "--config", str(write_config(tmp_path))])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "check expectations failed" in out
+
+
+def test_check_with_a_missing_config_returns_2(tmp_path, capsys, monkeypatch):
+    """A missing config file prints a message and returns 2."""
+    monkeypatch.delenv("ATURB_CONFIG", raising=False)
+    monkeypatch.chdir(tmp_path)
+    project = make_project(tmp_path)
+    write_expectation(project)
+    code = main(["check", str(project), "plt0001"])
+    out = capsys.readouterr().out
+    assert code == 2
+    assert "Traceback" not in out
