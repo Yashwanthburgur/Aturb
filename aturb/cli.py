@@ -1,8 +1,12 @@
-"""Command line interface: aturb build and aturb check.
+"""Command line interface: aturb build, aturb check and aturb eval.
 
-Both commands build a part through the active pack. ``build`` reports the
-build; ``check`` then runs the neutral checks over the exported STEP and
-prints one line per check.
+The build and check commands build a part through the active pack. ``build``
+reports the build; ``check`` then runs the neutral checks over the exported
+STEP and prints one line per check.
+
+The ``eval`` command runs a whole task set: it builds and scores every task
+folder of the set, writes the results to a dated file and prints one line per
+task and a summary of the run.
 
 The expected values of a part live in ``<project_dir>/expect/<part_id>.toml``.
 They hold numbers only, so the same file judges a part whatever built it.
@@ -14,11 +18,13 @@ import argparse
 from pathlib import Path
 
 from aturb.config import ConfigError, active_pack, load_config, timeout_s
+from aturb.contract.runner import Runner
 from aturb.contract.types import BuildRequest, BuildResult
 from aturb.packs import PackError, default_packs_root, load_runner
 from aturb.verify.result import CheckResult
 
 EXPECT_DIR = "expect"
+RESULTS_DIR_NAME = "results"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,12 +39,18 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("project_dir")
     check.add_argument("part_id")
     check.add_argument("--config", default=None)
+    evaluate = sub.add_parser("eval")
+    evaluate.add_argument("tasks_dir")
+    evaluate.add_argument("--config", default=None)
+    evaluate.add_argument("--results-dir", default=None)
     args = parser.parse_args(argv)
 
     try:
         cfg = load_config(Path(args.config) if args.config else None)
         name = active_pack(cfg)
         runner = load_runner(name, cfg, default_packs_root())
+        if args.command == "eval":
+            return _run_eval(args, runner, timeout_s(cfg))
         request = BuildRequest(
             project_root=str(Path(args.project_dir).resolve()),
             part_id=args.part_id,
@@ -130,6 +142,50 @@ def _failure_text(result: CheckResult) -> str:
     if result.expected is None or result.actual is None:
         return "the check could not be measured"
     return f"expected {result.expected}, got {result.actual}"
+
+
+def _run_eval(args: argparse.Namespace, runner: Runner, timeout: int) -> int:
+    """Run a task set, write its results and print what happened.
+
+    Every task folder of the set is built and scored, the results are written
+    to a dated file and one line per task is printed, followed by a summary of
+    the run. The summary score is the mean score of the tasks.
+
+    The measuring library is imported here and not at the top of the file, so
+    a plain build does not pay for loading it.
+    """
+    from aturb.evals.batch import run_batch
+    from aturb.evals.report import write_results
+    from aturb.evals.result import ERROR, FAILED, OK, set_score
+
+    tasks_dir = Path(args.tasks_dir).resolve()
+    results_dir = (
+        Path(args.results_dir).resolve()
+        if args.results_dir
+        else tasks_dir.parent / RESULTS_DIR_NAME
+    )
+    try:
+        results = run_batch(tasks_dir, runner, timeout)
+    except OSError as exc:
+        print(f"cannot read the task set {tasks_dir}: {exc}")
+        return 2
+    try:
+        write_results(results_dir, results)
+    except OSError as exc:
+        print(f"cannot write the results in {results_dir}: {exc}")
+        return 2
+
+    for result in results:
+        print(f"task {result.task_id} {result.status} score={result.score}")
+        if result.status in (FAILED, ERROR) and result.error:
+            print(result.error)
+    passed = sum(1 for result in results if result.status == OK)
+    failed = sum(1 for result in results if result.status == FAILED)
+    errored = sum(1 for result in results if result.status == ERROR)
+    print(
+        f"summary tasks={len(results)} passed={passed} failed={failed} "
+        f"errored={errored} score={set_score(results)}")
+    return 0 if passed == len(results) else 1
 
 
 if __name__ == "__main__":
