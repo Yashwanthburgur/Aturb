@@ -9,6 +9,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from aturb.agent.record import read_agent_runs
+from aturb.agent.types import ModelRequest, ModelResponse
 from aturb.cli import main
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +59,20 @@ def make_task_set(tmp_path: Path) -> Path:
     shutil.copytree(TASK_DIR, tasks / "plate_2holes",
                     ignore=shutil.ignore_patterns("out"))
     return tasks
+
+
+class _FakeClient:
+    """A model client that returns a canned candidate."""
+
+    def __init__(self, text: str = "stub part file") -> None:
+        """Take the candidate the client returns."""
+        self.text = text
+        self.requests: list[ModelRequest] = []
+
+    def complete(self, request: ModelRequest) -> ModelResponse:
+        """Record the request and return the canned candidate."""
+        self.requests.append(request)
+        return ModelResponse(text=self.text, input_tokens=120, output_tokens=45)
 
 
 def test_ok_build(tmp_path, capsys):
@@ -203,3 +219,72 @@ def test_eval_with_a_malformed_config_returns_2(tmp_path, capsys):
     assert code == 2
     assert "invalid TOML" in out
     assert "Traceback" not in out
+
+
+def test_eval_with_the_agent_returns_0(tmp_path, capsys, monkeypatch):
+    """The agent writes a candidate, the task is scored and the run returns 0."""
+    tasks = make_task_set(tmp_path)
+    client = _FakeClient()
+    monkeypatch.setattr("aturb.cli._model_client", lambda settings: client)
+
+    code = main(["eval", str(tasks), "--agent",
+                 "--config", str(write_config(tmp_path))])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "task plate_2holes ok score=1.0" in out
+    assert "summary tasks=1 passed=1 failed=0 errored=0 score=1.0" in out
+    assert len(client.requests) == 1
+
+
+def test_eval_with_the_agent_on_a_malformed_task_set_returns_1(tmp_path, capsys, monkeypatch):
+    """A malformed task is printed as an error and the run returns 1."""
+    tasks = make_task_set(tmp_path)
+    (tasks / "broken").mkdir()
+    monkeypatch.setattr("aturb.cli._model_client",
+                        lambda settings: _FakeClient())
+
+    code = main(["eval", str(tasks), "--agent",
+                 "--config", str(write_config(tmp_path))])
+
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "task broken error score=0.0" in out
+    assert "summary tasks=2 passed=1 failed=0 errored=1 score=0.5" in out
+
+
+def test_eval_with_the_agent_writes_both_files(tmp_path, capsys, monkeypatch):
+    """The run writes the result file and the agent file into the results folder."""
+    tasks = make_task_set(tmp_path)
+    results = tmp_path / "elsewhere"
+    monkeypatch.setattr("aturb.cli._model_client",
+                        lambda settings: _FakeClient())
+
+    code = main(["eval", str(tasks), "--agent",
+                 "--config", str(write_config(tmp_path)),
+                 "--results-dir", str(results)])
+
+    capsys.readouterr()
+    assert code == 0
+    agent_files = list(results.glob("*_agent.toml"))
+    assert len(list(results.glob("*.toml"))) == 2
+    runs = read_agent_runs(agent_files[0])
+    assert [(run.task_id, run.status)
+            for run in runs] == [("plate_2holes", "ok")]
+
+
+def test_eval_without_the_agent_is_unchanged(tmp_path, capsys, monkeypatch):
+    """Without the flag the command behaves exactly as it does today."""
+    tasks = make_task_set(tmp_path)
+    results = tmp_path / "elsewhere"
+    client = _FakeClient()
+    monkeypatch.setattr("aturb.cli._model_client", lambda settings: client)
+
+    code = main(["eval", str(tasks), "--config", str(write_config(tmp_path)),
+                 "--results-dir", str(results)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "task plate_2holes ok score=1.0" in out
+    assert client.requests == []
+    assert list(results.glob("*_agent.toml")) == []

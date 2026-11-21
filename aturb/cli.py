@@ -6,7 +6,8 @@ STEP and prints one line per check.
 
 The ``eval`` command runs a whole task set: it builds and scores every task
 folder of the set, writes the results to a dated file and prints one line per
-task and a summary of the run.
+task and a summary of the run. With the ``--agent`` flag the agent writes the
+candidate of every task first, and the same pipeline scores what it wrote.
 
 The expected values of a part live in ``<project_dir>/expect/<part_id>.toml``.
 They hold numbers only, so the same file judges a part whatever built it.
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from aturb.config import ConfigError, active_pack, load_config, timeout_s
 from aturb.contract.runner import Runner
@@ -23,8 +25,13 @@ from aturb.contract.types import BuildRequest, BuildResult
 from aturb.packs import PackError, default_packs_root, load_runner
 from aturb.verify.result import CheckResult
 
+if TYPE_CHECKING:
+    from aturb.agent.types import ModelClient
+    from aturb.evals.result import TaskResult
+
 EXPECT_DIR = "expect"
 RESULTS_DIR_NAME = "results"
+WORK_DIR_NAME = "tmp/agent"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,13 +50,18 @@ def main(argv: list[str] | None = None) -> int:
     evaluate.add_argument("tasks_dir")
     evaluate.add_argument("--config", default=None)
     evaluate.add_argument("--results-dir", default=None)
+    evaluate.add_argument("--agent", action="store_true")
     args = parser.parse_args(argv)
 
     try:
         cfg = load_config(Path(args.config) if args.config else None)
         name = active_pack(cfg)
-        runner = load_runner(name, cfg, default_packs_root())
+        packs_root = default_packs_root()
+        runner = load_runner(name, cfg, packs_root)
         if args.command == "eval":
+            if args.agent:
+                return _run_agent_eval(args, cfg, name, packs_root, runner,
+                                       timeout_s(cfg))
             return _run_eval(args, runner, timeout_s(cfg))
         request = BuildRequest(
             project_root=str(Path(args.project_dir).resolve()),
@@ -156,14 +168,9 @@ def _run_eval(args: argparse.Namespace, runner: Runner, timeout: int) -> int:
     """
     from aturb.evals.batch import run_batch
     from aturb.evals.report import write_results
-    from aturb.evals.result import ERROR, FAILED, OK, set_score
 
     tasks_dir = Path(args.tasks_dir).resolve()
-    results_dir = (
-        Path(args.results_dir).resolve()
-        if args.results_dir
-        else tasks_dir.parent / RESULTS_DIR_NAME
-    )
+    results_dir = _results_dir(args, tasks_dir)
     try:
         results = run_batch(tasks_dir, runner, timeout)
     except OSError as exc:
@@ -174,6 +181,98 @@ def _run_eval(args: argparse.Namespace, runner: Runner, timeout: int) -> int:
     except OSError as exc:
         print(f"cannot write the results in {results_dir}: {exc}")
         return 2
+    return _report_results(results)
+
+
+def _run_agent_eval(args: argparse.Namespace, cfg: dict, name: str,
+                    packs_root: Path, runner: Runner, timeout: int) -> int:
+    """Run the agent over a task set and score what it wrote.
+
+    Every task folder of the set is copied into the scratch area, the agent
+    writes one candidate there and the existing task runner builds and scores
+    that candidate. The results go to the dated result file of the run and the
+    agent runs go to the dated agent file next to it.
+
+    The exit codes are the ones of the plain run: 0 when every task is ok, 1
+    when any task is failed or error, and 2 for a configuration or pack error.
+    """
+    from aturb.agent.config import agent_settings
+    from aturb.agent.record import write_agent_runs
+    from aturb.agent.run import run_agent
+    from aturb.agent.types import AgentError
+    from aturb.evals.report import write_results
+    from aturb.evals.runner import run_task
+    from aturb.packs import discover
+
+    settings = agent_settings(cfg)
+    manifest = discover(packs_root)[name]
+    try:
+        client = _model_client(settings)
+    except AgentError as exc:
+        print(str(exc))
+        return 2
+
+    tasks_dir = Path(args.tasks_dir).resolve()
+    results_dir = _results_dir(args, tasks_dir)
+    work_dir = tasks_dir.parent / WORK_DIR_NAME
+    try:
+        folders = sorted(
+            (path for path in tasks_dir.iterdir() if path.is_dir()),
+            key=lambda path: path.name,
+        )
+    except OSError as exc:
+        print(f"cannot read the task set {tasks_dir}: {exc}")
+        return 2
+
+    results = []
+    runs = []
+    for folder in folders:
+        run = run_agent(folder, client, settings, manifest, work_dir)
+        runs.append(run)
+        results.append(run_task(work_dir / folder.name, runner, timeout))
+    try:
+        write_results(results_dir, results)
+        write_agent_runs(results_dir, runs)
+    except OSError as exc:
+        print(f"cannot write the results in {results_dir}: {exc}")
+        return 2
+    return _report_results(results)
+
+
+def _model_client(settings: dict) -> ModelClient:
+    """Build the model client of the configuration.
+
+    The provider, the model and the endpoint come from the configuration. The
+    API key comes from the environment variable the configuration names, never
+    from the configuration file itself.
+    """
+    from aturb.agent.config import read_api_key
+    from aturb.agent.model import HttpModelClient
+
+    key = read_api_key(settings)
+    return HttpModelClient(
+        base_url=settings["base_url"],
+        model=settings["model"],
+        api_key=key,
+        timeout=float(settings["timeout_s"]),
+        provider=settings["provider"],
+    )
+
+
+def _results_dir(args: argparse.Namespace, tasks_dir: Path) -> Path:
+    """Return the folder the results of a run are written to."""
+    if args.results_dir:
+        return Path(args.results_dir).resolve()
+    return tasks_dir.parent / RESULTS_DIR_NAME
+
+
+def _report_results(results: list[TaskResult]) -> int:
+    """Print one line per task and the summary of the run.
+
+    The summary score is the mean score of the tasks. The exit code is 0 when
+    every task is ok and 1 when any task is failed or error.
+    """
+    from aturb.evals.result import ERROR, FAILED, OK, set_score
 
     for result in results:
         print(f"task {result.task_id} {result.status} score={result.score}")
