@@ -7,6 +7,7 @@ __pycache__/
 
 # Local machine config (paths and keys)
 aturb.local.toml
+.env
 
 # Build products (any folder named out)
 out/
