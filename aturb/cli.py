@@ -204,9 +204,9 @@ def _run_agent_eval(args: argparse.Namespace, cfg: dict, name: str,
     from aturb.evals.runner import run_task
     from aturb.packs import discover
 
-    settings = agent_settings(cfg)
     manifest = discover(packs_root)[name]
     try:
+        settings = agent_settings(cfg)
         client = _model_client(settings)
     except AgentError as exc:
         print(str(exc))

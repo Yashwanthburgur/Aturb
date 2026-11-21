@@ -19,13 +19,12 @@ DEMO_EXPECT = REPO_ROOT / "projects" / "demo" / "expect" / "plt0001.toml"
 TASK_DIR = REPO_ROOT / "evals" / "tasks" / "plate_2holes"
 
 
-def write_config(tmp_path: Path) -> Path:
-    """Write a tmp config with the stub pack active and return its path."""
+def write_config(tmp_path: Path, agent: str = "") -> Path:
+    """Write a tmp config with the stub pack active; agent goes before the tables."""
     config = tmp_path / "aturb.local.toml"
-    config.write_text(
-        'active_pack = "stub"\n[packs.stub]\n[timeouts]\nbuild_s = 60\n',
-        encoding="utf-8",
-    )
+    text = agent + 'active_pack = "stub"\n'
+    text += '[packs.stub]\n[timeouts]\nbuild_s = 60\n'
+    config.write_text(text, encoding="utf-8")
     return config
 
 
@@ -288,3 +287,12 @@ def test_eval_without_the_agent_is_unchanged(tmp_path, capsys, monkeypatch):
     assert "task plate_2holes ok score=1.0" in out
     assert client.requests == []
     assert list(results.glob("*_agent.toml")) == []
+
+
+def test_eval_with_the_agent_on_a_malformed_agent_section_returns_2(tmp_path, capsys):
+    """A malformed agent section is refused before the task set is read."""
+    config = write_config(tmp_path, 'agent = "text"\n')
+    code = main(["eval", str(tmp_path), "--agent", "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 2
+    assert "'agent' section" in out and "Traceback" not in out
