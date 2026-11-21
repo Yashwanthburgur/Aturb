@@ -9,3 +9,17 @@ cmd = ""
 
 [timeouts]
 build_s = 60  # starting default
+
+[agent]
+# The API key is never written here. The core reads the environment variable
+# named by api_key_env.
+provider = "openai_compatible"          # starting default
+model = ""                              # the model identifier to send
+base_url = ""                           # the endpoint of the provider
+api_key_env = "ATURB_AGENT_API_KEY"     # starting default
+max_input_tokens = 20000                # starting default
+max_output_tokens = 8000                # starting default
+max_cost_usd = 0.50                     # starting default
+input_price_per_mtok = 0.0              # starting default
+output_price_per_mtok = 0.0             # starting default
+timeout_s = 120                         # starting default
