@@ -7,3 +7,5 @@ Architecture decision records, one per decision, 10 to 20 lines each.
 - [ADR-0005: Checks run on STEP](0005-checks-on-step.md) — correctness is judged only from the exported STEP.
 - [ADR-0006: Task identity and answer schema](0006-task-identity-and-answer-schema.md) — the task ID and the part ID are separate, and the answer schema has five keys.
 - [ADR-0007: Selection rule and helper boundary](0007-selection-rule-and-helper-boundary.md) — geometry is selected by its geometric properties; the helper selects, measures and asserts, and never creates a feature.
+- [ADR-0008: Exclude expectations from the prompt](0008-exclude-expectations-from-prompt.md) — the expected values of the evaluator never reach the prompt.
+- [ADR-0009: The bounded improvement loop](0009-bounded-improvement-loop.md) — the agent may try again a bounded number of times, and the repair feedback carries only what the candidate itself measures.
