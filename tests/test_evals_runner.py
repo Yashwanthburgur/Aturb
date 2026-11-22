@@ -11,6 +11,7 @@ import shutil
 from pathlib import Path
 
 from aturb.contract.types import BuildRequest, BuildResult, PackInfo
+from aturb.evals.judge import judge_task
 from aturb.evals.result import ERROR, FAILED, OK
 from aturb.evals.runner import run_task
 from aturb.packs import default_packs_root, load_runner
@@ -206,3 +207,11 @@ def test_the_expectation_file_named_by_the_answer_is_used(tmp_path):
 
     assert result.status == OK
     assert result.score == 1.0
+
+
+def test_the_runner_returns_the_result_of_the_judgement():
+    """The runner returns the result of the one judgement of the task."""
+    result = run_task(TASK_DIR, make_runner(), 60)
+    judgement = judge_task(TASK_DIR, make_runner(), 60)
+
+    assert result == judgement.result
