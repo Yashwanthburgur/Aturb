@@ -1,8 +1,9 @@
 """The project conventions of a part file, and the checker of the ones text can show.
 
-The conventions are C1 to C6 of docs/CONVENTIONS.md. This module checks C1, C2,
-C3 and C5, the rules that can be checked from the text of a file without a CAD.
-C4 and C6 are judged by the neutral checks and by the evaluation, not here.
+The conventions are C1 to C6 of docs/CONVENTIONS.md. This module holds the text
+the prompt carries and the checker of the rules that can be checked from the text
+of a file without a CAD. C4 and C6 are judged by the neutral checks and by the
+evaluation, not by the checker.
 
 The checker is advisory. It returns one finding per broken rule and never
 raises for a broken rule, so a caller can report the findings and carry on.
@@ -15,6 +16,23 @@ so a part file in any language is read the same way.
 from __future__ import annotations
 
 import re
+
+# The text of the conventions that the prompt carries. It names the rules C1 to
+# C6, so the document, the checker and the prompt cannot drift apart.
+CONVENTIONS_TEXT = """\
+Project conventions. Follow these six rules in the part file you write.
+C1 part identity: the part file is named <part_id>_<name><extension>; the part ID is the identity.
+C2 parameter block: the dimensions are named constants at the top of the file, in a
+    marked block, and every constant name ends with `_MM`. Mark the block with the
+    comments `# --- PARAMS ---` and `# --- END PARAMS ---`.
+C3 units: every length is in millimetres, and the file says so.
+C4 placement: the part is centred on the origin in X and Y and spans Z = 0 to its
+    thickness.
+C5 no machine values: no absolute path, no drive letter and no machine-specific
+    value in the file.
+C6 expectations are authoritative: the expectation file is input and is not changed
+    by the agent without a declared reason.
+"""
 
 # The parameter-block markers of the demo part, unchanged.
 PARAM_START = "# --- PARAMS ---"
@@ -32,6 +50,16 @@ ASSIGNMENT_RE = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*(?::[^=]+)?=")
 STRING_RE = re.compile(
     r"'''.*?'''|\"\"\".*?\"\"\"|'[^'\n]*'|\"[^\"\n]*\"", re.DOTALL)
+
+
+def conventions_text() -> str:
+    """Return the text of the project conventions that the prompt carries.
+
+    The text is fixed and names the rules C1 to C6 of docs/CONVENTIONS.md, so the
+    document, the checker and the prompt cannot drift apart. The same text comes
+    back on every call: it depends on nothing but this module.
+    """
+    return CONVENTIONS_TEXT
 
 
 def check_conventions(part_id: str, extension: str, text: str) -> list[str]:

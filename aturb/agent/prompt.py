@@ -1,9 +1,9 @@
 """Compose the prompt of one agent run and name it.
 
-The prompt is built in a fixed order from five sections: the core instruction,
-the prompt of the pack, the requirement of the task, the expected values of
-the part and the output contract. The order never changes, so the same inputs
-always give the same prompt.
+The prompt is built in a fixed order from six sections: the core instruction,
+the prompt of the pack, the project conventions, the requirement of the task,
+the expected values of the part and the output contract. The order never
+changes, so the same inputs always give the same prompt.
 
 The version of a prompt is the first sixteen hexadecimal characters of the
 SHA-256 of the exact text that is sent to the model. A hash needs no registry
@@ -13,6 +13,8 @@ and cannot drift from the text.
 from __future__ import annotations
 
 import hashlib
+
+from aturb.agent.conventions import conventions_text
 
 CORE_INSTRUCTION = """\
 Write one part file and nothing else. Return the complete source of a single
@@ -33,10 +35,10 @@ VERSION_LENGTH = 16
 def compose_prompt(pack_prompt: str, requirement: str, expectations: str) -> str:
     """Return the prompt of one agent run.
 
-    The five sections are joined in a fixed order with one blank line between
-    them: the core instruction, the pack prompt, the requirement, the
-    expectations and the output contract. Every section is trimmed, so the
-    blank line between two sections is always exactly one.
+    The six sections are joined in a fixed order with one blank line between
+    them: the core instruction, the pack prompt, the project conventions, the
+    requirement, the expectations and the output contract. Every section is
+    trimmed, so the blank line between two sections is always exactly one.
 
     An empty pack prompt or an empty requirement is refused: the prompt would
     be missing the instructions of the pack or the intent of the task.
@@ -48,6 +50,7 @@ def compose_prompt(pack_prompt: str, requirement: str, expectations: str) -> str
     sections = (
         CORE_INSTRUCTION,
         pack_prompt,
+        conventions_text(),
         requirement,
         expectations,
         OUTPUT_CONTRACT,

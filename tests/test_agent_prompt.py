@@ -12,6 +12,8 @@ import re
 
 import pytest
 
+from aturb.agent import prompt as prompt_module
+from aturb.agent.conventions import conventions_text
 from aturb.agent.prompt import (
     CORE_INSTRUCTION,
     OUTPUT_CONTRACT,
@@ -28,12 +30,13 @@ EXPECTATIONS = "volume = 35214.602"
 
 
 def test_the_sections_keep_their_order():
-    """The five sections appear in the order the prompt is built in."""
+    """The six sections appear in the order the prompt is built in."""
     prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
 
     expected = "\n\n".join([
         CORE_INSTRUCTION.strip(),
         PACK_PROMPT,
+        conventions_text().strip(),
         REQUIREMENT,
         EXPECTATIONS,
         OUTPUT_CONTRACT.strip(),
@@ -43,12 +46,12 @@ def test_the_sections_keep_their_order():
 
 
 def test_the_sections_are_separated_by_one_blank_line():
-    """The five sections are joined with exactly one blank line."""
+    """The six sections are joined with exactly one blank line."""
     prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
 
     sections = prompt.split("\n\n")
 
-    assert len(sections) == 5
+    assert len(sections) == 6
     assert "\n\n\n" not in prompt
 
 
@@ -148,3 +151,96 @@ def test_a_text_with_only_a_closing_fence_is_unchanged():
     text = "print('hi')\n```"
 
     assert strip_code_fence(text) == text
+
+
+def test_the_prompt_carries_the_conventions():
+    """The composed prompt holds the text of the project conventions."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    assert conventions_text().strip() in prompt
+
+
+def test_the_conventions_come_after_the_pack_prompt():
+    """The conventions follow the prompt of the pack."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    assert prompt.index(PACK_PROMPT) < prompt.index(conventions_text().strip())
+
+
+def test_the_conventions_come_before_the_requirement():
+    """The conventions come before the requirement of the task."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    assert prompt.index(conventions_text().strip()) < prompt.index(REQUIREMENT)
+
+
+def test_the_prompt_names_every_convention():
+    """The prompt names the rules C1 to C6."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    for rule in ("C1", "C2", "C3", "C4", "C5", "C6"):
+        assert rule in prompt
+
+
+def test_the_five_original_sections_keep_their_order():
+    """The five sections that were already there keep their order."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    positions = [
+        prompt.index(section)
+        for section in (
+            CORE_INSTRUCTION.strip(),
+            PACK_PROMPT,
+            REQUIREMENT,
+            EXPECTATIONS,
+            OUTPUT_CONTRACT.strip(),
+        )
+    ]
+
+    assert positions == sorted(positions)
+
+
+def test_every_section_appears_once():
+    """No section of the prompt is removed or duplicated."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    sections = (
+        CORE_INSTRUCTION.strip(),
+        PACK_PROMPT,
+        conventions_text().strip(),
+        REQUIREMENT,
+        EXPECTATIONS,
+        OUTPUT_CONTRACT.strip(),
+    )
+
+    for section in sections:
+        assert prompt.count(section) == 1
+
+
+def test_the_same_inputs_give_the_same_prompt():
+    """The composition is deterministic."""
+    first = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    second = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    assert first == second
+
+
+def test_the_same_inputs_give_the_same_version():
+    """The same prompt always gives the same version."""
+    first = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    second = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    assert prompt_version(first) == prompt_version(second)
+
+
+def test_the_version_changes_when_the_conventions_change(monkeypatch):
+    """A different convention text gives a different prompt and version."""
+    first = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    monkeypatch.setattr(prompt_module, "conventions_text",
+                        lambda: "C1 changed")
+
+    second = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+
+    assert first != second
+    assert prompt_version(first) != prompt_version(second)
