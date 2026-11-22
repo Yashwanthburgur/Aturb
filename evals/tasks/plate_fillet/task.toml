@@ -1,0 +1,13 @@
+# Task metadata for the second task of the Phase 6 set.
+#
+# The task ID names the task; the part ID names the CAD part the task builds.
+# The two are allowed to differ, and here they do: the task is plate_fillet,
+# the part is plt0002.
+#
+# The description is a human-readable summary for a reader. The engineering
+# prompt lives in project/requirements/plt0002.md and is not a request field.
+
+task_id = "plate_fillet"
+part_id = "plt0002"
+name = "Plate with filleted corners and two through holes"
+description = "Build a 120 x 60 x 5 mm plate with a 3 mm fillet on the four vertical corner edges and two 10 mm through holes at x = -40 and x = +40."

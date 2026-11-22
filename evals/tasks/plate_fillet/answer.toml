@@ -1,0 +1,10 @@
+# The correct answer for the task plate_fillet. Exactly five keys.
+#
+# This file stays outside the candidate project: the runner never reads it.
+# The expected values themselves live in the project, in expect/plt0002.toml.
+
+task_id = "plate_fillet"
+part_id = "plt0002"
+expect_file = "expect/plt0002.toml"
+required_checks = ["volume", "bbox_x", "bbox_y", "bbox_z", "hole_count"]
+max_score = 1.0

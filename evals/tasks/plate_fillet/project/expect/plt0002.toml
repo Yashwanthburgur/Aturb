@@ -1,0 +1,26 @@
+# Expected measurements for the filleted plate plt0002.
+#
+# Numbers only: no geometry, no feature tree, no CAD operation.
+# The agent may not change these values without a declared reason.
+#
+# Hand calculation, from the part parameters in
+# evals/tasks/plate_fillet/project/parts/plt0002_base_plate_fillet.py:
+#   plate volume = 120 x 60 x 5 = 36000 mm^3
+#   one corner fillet removes (3^2 - pi x 3^2 / 4) x 5 = 9.657085 mm^3
+#   four fillets remove 38.628331 mm^3
+#   filleted plate = 36000 - 38.628331 = 35961.371669 mm^3
+#   two holes remove 2 x pi x 5^2 x 5 = 785.398163 mm^3
+#   expected volume = 35961.371669 - 785.398163 = 35175.973506 mm^3
+#   the hole centres are 80 mm apart, so at x = -40 and x = +40, on y = 0
+#
+# Measured in-session on FreeCAD 1.0.1 and read back with build123d:
+#   volume 35175.9735060141 mm^3, bbox 120 x 60 x 5 mm, 12 faces, one solid,
+#   two through holes of 10 mm at x = -40 and x = +40 on y = 0.
+#
+# A hole position is where the hole sits in the plane of the plate: x and y.
+
+volume = 35175.973506
+bbox = [120.0, 60.0, 5.0]
+hole_count = 2
+hole_diameter = 10.0
+hole_positions = [[-40.0, 0.0], [40.0, 0.0]]
