@@ -2,18 +2,21 @@
 
 The whole path is proven: the prompt is composed, the model answers with a
 canned candidate, the stub pack builds it, the neutral checks run over the
-exported STEP and the task is scored. The agent runs are recorded in their own
-dated file, and the committed task folder is never written to.
+exported STEP and the task is scored. The committed task set is never written to.
 """
 
 from __future__ import annotations
 
 import shutil
+import subprocess
+import sys
+import tomllib
 from pathlib import Path
 
 import pytest
 
 from aturb.agent.config import agent_settings
+from aturb.agent.conventions import check_conventions, conventions_text
 from aturb.agent.record import read_agent_runs
 from aturb.agent.run import run_agent
 from aturb.agent.types import AgentError, ModelRequest, ModelResponse
@@ -21,15 +24,42 @@ from aturb.cli import main
 from aturb.packs import load_manifest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TASK_DIR = REPO_ROOT / "evals" / "tasks" / "plate_2holes"
+TASK_SET = REPO_ROOT / "evals" / "tasks"
+TASK_DIR = TASK_SET / "plate_2holes"
+FILLET_TASK_DIR = TASK_SET / "plate_fillet"
 STUB_PACK = load_manifest(REPO_ROOT / "packs" / "stub" / "pack.toml")
 
 TASK_ID = "plate_2holes"
+PART_ID = "plt0001"
+FILLET_PART_ID = "plt0002"
 MODEL = "some-model-id"
-CANDIDATE = "stub part file\n"
+# The canned answer of the fake client: a stub part file that follows the
+# project conventions, so the run proves that a candidate can meet them.
+CANDIDATE = """\
+# PLT0001 Base plate. Units: millimetres.
+# The stub pack ignores the content of this file.
+# --- PARAMS ---
+LENGTH_MM = 120.0
+WIDTH_MM = 60.0
+THICKNESS_MM = 5.0
+# --- END PARAMS ---
+"""
 INPUT_TOKENS = 120
 OUTPUT_TOKENS = 45
 COST = (INPUT_TOKENS * 1.0 + OUTPUT_TOKENS * 2.0) / 1_000_000
+PROBE_TIMEOUT_S = 60  # starting default
+
+# The probe runs in a fresh interpreter, so the import graph of the core is
+# seen as it is and not as the test session left it.
+CORE_PROBE = (
+    "import sys\n"
+    "import aturb.agent.run\n"
+    "leaked = [name for name in sys.modules\n"
+    "          if name.split('.')[0] in ('packs', 'freecad', 'FreeCAD')]\n"
+    "assert not leaked, leaked\n"
+    "assert not hasattr(aturb.agent.run, 'helper')\n"
+    "print('CORE_ISOLATED')\n"
+)
 
 
 class _FakeClient:
@@ -114,13 +144,23 @@ def _rename_task(task_dir: Path, task_id: str) -> None:
         )
 
 
-def _files(folder: Path) -> set[str]:
-    """Return the relative paths of every file under a folder."""
+def _snapshot(folder: Path) -> dict[str, bytes]:
+    """Return the path and the bytes of every file under a folder.
+
+    The bytes are read, so a file changed in place is seen as changed.
+    """
     return {
-        path.relative_to(folder).as_posix()
-        for path in folder.rglob("*")
+        path.relative_to(folder).as_posix(): path.read_bytes()
+        for path in sorted(folder.rglob("*"))
         if path.is_file()
     }
+
+
+def _expected_values(task_dir: Path, part_id: str) -> dict:
+    """Return the expected values of a part, read from its expectation file."""
+    path = task_dir / "project" / "expect" / f"{part_id}.toml"
+    with path.open("rb") as handle:
+        return tomllib.load(handle)
 
 
 def _agent_file(results_dir: Path) -> Path:
@@ -174,17 +214,59 @@ def test_the_agent_run_file_holds_one_record_per_task(tmp_path, capsys, monkeypa
     assert run.cost_usd == pytest.approx(COST)
 
 
-def test_the_committed_task_folder_is_unchanged(tmp_path):
-    """The run writes into the scratch area, never into the committed task."""
-    before = _files(TASK_DIR)
+def test_the_prompt_of_the_run_carries_the_conventions_and_no_expected_value(tmp_path):
+    """The prompt carries the conventions and no expected value of the task."""
+    settings = agent_settings({"agent": {"model": MODEL}})
+    for task_dir, part_id in ((TASK_DIR, PART_ID),
+                              (FILLET_TASK_DIR, FILLET_PART_ID)):
+        client = _FakeClient()
+        run = run_agent(task_dir, client, settings, STUB_PACK, tmp_path)
+
+        assert run.status == "ok"
+        prompt = client.requests[0].prompt
+        assert conventions_text().strip() in prompt
+        # ADR-0008: the expected values of the evaluator never reach the model.
+        expected = _expected_values(task_dir, part_id)
+        assert str(expected["volume"]) not in prompt
+
+
+def test_the_candidate_of_the_run_follows_the_conventions(tmp_path):
+    """The candidate the agent writes follows the conventions of the project."""
+    client = _FakeClient()
     settings = agent_settings({"agent": {"model": MODEL}})
 
-    run = run_agent(TASK_DIR, _FakeClient(), settings, STUB_PACK, tmp_path)
+    run = run_agent(TASK_DIR, client, settings, STUB_PACK, tmp_path)
 
     assert run.status == "ok"
-    assert _files(TASK_DIR) == before
-    parts = TASK_DIR / "project" / "parts"
-    assert list(parts.glob("*_candidate*")) == []
+    candidate = (tmp_path / TASK_ID / "project" / "parts"
+                 / f"{PART_ID}_candidate{STUB_PACK.part_extension}")
+    assert candidate.is_file()
+    text = candidate.read_text(encoding="utf-8")
+    assert check_conventions(PART_ID, STUB_PACK.part_extension, text) == []
+
+
+def test_the_committed_task_set_is_unchanged_after_the_run(tmp_path):
+    """The run writes into the scratch area, never into the committed tasks."""
+    before = _snapshot(TASK_SET)
+    settings = agent_settings({"agent": {"model": MODEL}})
+    folders = [path for path in sorted(TASK_SET.iterdir()) if path.is_dir()]
+
+    for folder in folders:
+        run = run_agent(folder, _FakeClient(), settings, STUB_PACK, tmp_path)
+        assert run.status == "ok"
+
+    assert _snapshot(TASK_SET) == before
+    for folder in folders:
+        parts = folder / "project" / "parts"
+        assert list(parts.glob("*_candidate*")) == []
+
+
+def test_the_helper_is_not_reachable_from_the_core():
+    """The core never imports the pack, so the helper stays in the pack."""
+    proc = subprocess.run([sys.executable, "-c", CORE_PROBE], cwd=REPO_ROOT,
+                          capture_output=True, text=True, timeout=PROBE_TIMEOUT_S)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "CORE_ISOLATED" in proc.stdout
 
 
 def test_a_failing_client_gives_an_error_run_and_the_run_goes_on(tmp_path, capsys, monkeypatch):
