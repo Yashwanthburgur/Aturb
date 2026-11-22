@@ -2,6 +2,9 @@
 
 Reads the job JSON from os.environ["ATURB_REQUEST"], builds the part, and always
 writes a result JSON to job["result_path"], even if everything inside fails.
+
+The selection helper of the pack is loaded by path and put into the namespace of
+the part file, so the part file can use it without an import (T6.05, mechanism A).
 """
 
 import importlib.util
@@ -11,16 +14,28 @@ import traceback
 
 import FreeCAD as App
 
-STATE_MODULE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "fc_state.py")
+PACK_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATE_MODULE = os.path.join(PACK_DIR, "harness", "fc_state.py")
+HELPER_MODULE = os.path.join(PACK_DIR, "helper", "select.py")
+HELPER_NAME = "helper"
+
+
+def _load_module(name, path):
+    """Load a module by path, so no import path is assumed."""
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _load_state_module():
     """Load the sibling state helper by path, so no import path is assumed."""
-    spec = importlib.util.spec_from_file_location("fc_state", STATE_MODULE)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return _load_module("fc_state", STATE_MODULE)
+
+
+def _load_helper_module():
+    """Load the selection helper of the pack by path, so no import is assumed."""
+    return _load_module("fc_helper", HELPER_MODULE)
 
 
 def main():
@@ -37,11 +52,15 @@ def main():
         "artifacts": {},
     }
     try:
+        helper = _load_helper_module()
         doc = App.newDocument(job["part_id"])
         try:
             spec = importlib.util.spec_from_file_location(
                 "aturb_part", job["part_file"])
             module = importlib.util.module_from_spec(spec)
+            # Mechanism A of T6.05: the helper is in the namespace of the part
+            # file before the part file runs, so the part file needs no import.
+            module.__dict__[HELPER_NAME] = helper
             spec.loader.exec_module(module)
         except SyntaxError:
             result["failure_kind"] = "syntax_error"
