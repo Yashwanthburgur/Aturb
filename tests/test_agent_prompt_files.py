@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from aturb.packs import discover
+from packs.freecad import helper as freecad_helper
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKS_ROOT = REPO_ROOT / "packs"
@@ -21,6 +22,10 @@ API_NOTES_DIR = REPO_ROOT / "docs" / "api_notes"
 PROMPT_FILE_NAME = "agent.md"
 
 TASK_ID = re.compile(r"T\d+\.\d+")
+HELPER_CALL = re.compile(r"helper\.(\w+)\(")
+
+# The public calls of the selection helper of the FreeCAD pack.
+HELPER_CALLS = sorted(freecad_helper.__all__)
 
 MANIFESTS = discover(PACKS_ROOT)
 PACK_NAMES = sorted(MANIFESTS)
@@ -40,6 +45,15 @@ def _prompt_text(pack_name: str) -> str:
 def _note_path(pack_name: str) -> Path:
     """Return the API note of one pack."""
     return API_NOTES_DIR / f"{pack_name}.md"
+
+
+def _flat(text: str) -> str:
+    """Return the text with its line breaks turned into single spaces.
+
+    A prompt is wrapped for reading, so a phrase may cross a line break. The
+    tests look for phrases, not for the place where the author wrapped them.
+    """
+    return " ".join(text.split())
 
 
 @pytest.mark.parametrize("pack_name", PACK_NAMES)
@@ -74,6 +88,59 @@ def test_the_freecad_prompt_names_the_output_contract():
 
     assert "## Output contract" in text
     assert "nothing else" in text
+
+
+def test_the_freecad_prompt_names_the_helper():
+    """The FreeCAD prompt names the helper and the global it arrives under."""
+    text = _flat(_prompt_text("freecad"))
+
+    assert "## The selection helper" in text
+    assert "`helper`" in text
+    assert "do not import it" in text
+
+
+def test_the_freecad_prompt_states_the_boundary_of_the_helper():
+    """The prompt states what the helper does and what it never does."""
+    text = _flat(_prompt_text("freecad"))
+
+    assert "selects, measures and asserts" in text
+    assert "never creates a feature" in text
+    assert "You still create the feature and set its parameters" in text
+
+
+def test_the_freecad_prompt_states_the_selection_rule():
+    """The prompt states that selection is by property and never by index."""
+    text = _flat(_prompt_text("freecad"))
+
+    assert "by geometric property" in text
+    assert "never by an assumed positional index" in text
+
+
+def test_the_freecad_prompt_names_every_call_of_the_helper():
+    """Every public call of the helper is named in the pack prompt."""
+    text = _flat(_prompt_text("freecad"))
+
+    for name in HELPER_CALLS:
+        assert f"helper.{name}(" in text
+
+
+def test_the_freecad_prompt_names_no_call_the_helper_does_not_have():
+    """Every helper call the prompt names exists in the helper module."""
+    text = _flat(_prompt_text("freecad"))
+
+    named = set(HELPER_CALL.findall(text))
+
+    assert named <= set(HELPER_CALLS)
+
+
+def test_the_freecad_prompt_names_no_task_and_no_expected_value():
+    """The pack prompt leaks no task of the set and no expected value."""
+    text = _flat(_prompt_text("freecad"))
+
+    assert "plate_2holes" not in text
+    assert "plt0001" not in text
+    assert "35214" not in text
+    assert "35175" not in text
 
 
 def test_the_stub_prompt_names_the_file_contract():
