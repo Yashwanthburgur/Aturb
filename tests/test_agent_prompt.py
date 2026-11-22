@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from pathlib import Path
 
 import pytest
 
@@ -21,6 +22,8 @@ from aturb.agent.prompt import (
     prompt_version,
     strip_code_fence,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 HEX = re.compile(r"^[0-9a-f]{16}$")
 
@@ -240,3 +243,55 @@ def test_the_version_changes_when_the_conventions_change(monkeypatch):
 
     assert first != second
     assert prompt_version(first) != prompt_version(second)
+
+
+def test_the_prompt_without_feedback_is_the_phase_six_prompt():
+    """The prompt without feedback is the five-section prompt of Phase 6."""
+    expected = "\n\n".join([
+        CORE_INSTRUCTION.strip(), PACK_PROMPT, conventions_text().strip(),
+        REQUIREMENT, OUTPUT_CONTRACT.strip(),
+    ])
+
+    assert compose_prompt(PACK_PROMPT, REQUIREMENT) == expected
+    assert compose_prompt(PACK_PROMPT, REQUIREMENT, "") == expected
+    assert compose_prompt(PACK_PROMPT, REQUIREMENT, "   \n ") == expected
+
+
+@pytest.mark.parametrize("task, part, version", [
+    ("plate_2holes", "plt0001", "25830ef6f36acf93"),
+    ("plate_fillet", "plt0002", "ca0607a60b7eacb6"),
+])
+def test_the_committed_prompt_versions_are_unchanged(task, part, version):
+    """The prompt of every committed task keeps its Phase 6 version."""
+    pack_prompt = (REPO_ROOT / "packs" / "freecad" / "prompt"
+                   / "agent.md").read_text(encoding="utf-8")
+    requirement = (REPO_ROOT / "evals" / "tasks" / task / "project"
+                   / "requirements" / f"{part}.md").read_text(encoding="utf-8")
+
+    assert prompt_version(compose_prompt(pack_prompt, requirement)) == version
+
+
+def test_the_feedback_comes_between_the_requirement_and_the_contract():
+    """A prompt with feedback has six sections and the feedback is in the middle."""
+    feedback = "## Repair"
+
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, feedback)
+
+    sections = prompt.split("\n\n")
+    assert len(sections) == 6
+    assert sections[3] == REQUIREMENT
+    assert sections[4] == feedback
+    assert sections[5] == OUTPUT_CONTRACT.strip()
+    assert prompt_version(prompt) != prompt_version(
+        compose_prompt(PACK_PROMPT, REQUIREMENT))
+
+
+def test_a_long_feedback_is_kept_whole_and_in_the_middle():
+    """A feedback block with lines of its own is kept whole, in the middle."""
+    feedback = "## Repair\n\nThe previous file is replaced by the file you write now."
+
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, feedback)
+
+    assert feedback in prompt
+    assert prompt.index(REQUIREMENT) < prompt.index(feedback)
+    assert prompt.index(feedback) < prompt.index(OUTPUT_CONTRACT.strip())

@@ -5,6 +5,11 @@ the prompt of the pack, the project conventions, the requirement of the task
 and the output contract. The order never changes, so the same inputs always
 give the same prompt.
 
+A repair attempt adds one section: the feedback block of the previous attempt,
+between the requirement and the output contract. The block carries
+candidate-side inputs only, so the prompt of the first attempt is the five
+sections of Phase 6, byte for byte.
+
 The expected values of the part are not in the prompt: the evaluator holds
 them ([`ADR-0008`](../../docs/adr/0008-exclude-expectations-from-prompt.md)).
 
@@ -35,13 +40,17 @@ FENCE = "```"
 VERSION_LENGTH = 16
 
 
-def compose_prompt(pack_prompt: str, requirement: str) -> str:
+def compose_prompt(pack_prompt: str, requirement: str, feedback: str = "") -> str:
     """Return the prompt of one agent run.
 
     The five sections are joined in a fixed order with one blank line between
     them: the core instruction, the pack prompt, the project conventions, the
     requirement and the output contract. Every section is trimmed, so the
     blank line between two sections is always exactly one.
+
+    A feedback block is inserted between the requirement and the output
+    contract, so a prompt with feedback has six sections. An empty feedback
+    gives the five-section prompt of Phase 6, byte for byte.
 
     An empty pack prompt or an empty requirement is refused: the prompt would
     be missing the instructions of the pack or the intent of the task.
@@ -50,13 +59,15 @@ def compose_prompt(pack_prompt: str, requirement: str) -> str:
         raise ValueError("the pack prompt is empty")
     if not requirement.strip():
         raise ValueError("the requirement is empty")
-    sections = (
+    sections = [
         CORE_INSTRUCTION,
         pack_prompt,
         conventions_text(),
         requirement,
-        OUTPUT_CONTRACT,
-    )
+    ]
+    if feedback.strip():
+        sections.append(feedback)
+    sections.append(OUTPUT_CONTRACT)
     return "\n\n".join(section.strip() for section in sections)
 
 
