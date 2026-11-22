@@ -150,6 +150,10 @@ can be seen in a diff, but whether a declared reason exists, and whether a chang
 was legitimate, is judged by the evaluation. The roadmap assigns C6 to the
 evaluation, not to the text checker.
 
+**ADR-0008.** The expectation file is evaluator input. It is not sent to the
+agent in the prompt, so the agent never sees the expected values
+([`docs/adr/0008-exclude-expectations-from-prompt.md`](adr/0008-exclude-expectations-from-prompt.md)).
+
 ## Boundaries
 
 **Static text inspection is not a proof of geometry.** Static text inspection

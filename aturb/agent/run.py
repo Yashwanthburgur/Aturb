@@ -1,10 +1,9 @@
 """One agent run: one task, one model call, one candidate file, one agent run.
 
 The run is the whole agent path of one task. It reads the task file, the
-requirement file, the expectation file and the prompt of the pack, composes
-the prompt, checks the limits, calls the model once, strips the code fence of
-the answer and writes the answer into the scratch project as the candidate of
-the part.
+requirement file and the prompt of the pack, composes the prompt, checks the
+limits, calls the model once, strips the code fence of the answer and writes
+the answer into the scratch project as the candidate of the part.
 
 Every failure is a run with ``status = "error"`` and an error text, never an
 exception: a missing requirement file, a missing pack prompt, a refused
@@ -30,10 +29,8 @@ from aturb.packs import PackManifest
 
 PROJECT_DIR_NAME = "project"
 REQUIREMENTS_DIR_NAME = "requirements"
-EXPECT_DIR_NAME = "expect"
 PROMPT_FILE_NAME = "agent.md"
 REQUIREMENT_SUFFIX = ".md"
-EXPECT_SUFFIX = ".toml"
 
 CHARS_PER_TOKEN = 4  # starting default
 TOKENS_PER_MTOK = 1_000_000
@@ -84,14 +81,10 @@ def run_agent(
             scratch / PROJECT_DIR_NAME / REQUIREMENTS_DIR_NAME
             / f"{spec.part_id}{REQUIREMENT_SUFFIX}",
             "the requirement file")
-        expectations = _read_text(
-            scratch / PROJECT_DIR_NAME / EXPECT_DIR_NAME
-            / f"{spec.part_id}{EXPECT_SUFFIX}",
-            "the expectation file")
         pack_prompt = _read_text(
             pack.pack_dir / pack.prompt_dir / PROMPT_FILE_NAME,
             "the pack prompt")
-        prompt = compose_prompt(pack_prompt, requirement, expectations)
+        prompt = compose_prompt(pack_prompt, requirement)
     except ValueError as exc:
         return _error_run(spec.task_id, spec.part_id, provider, model, "", str(exc))
 

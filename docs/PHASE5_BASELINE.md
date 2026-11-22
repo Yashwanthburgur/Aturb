@@ -17,6 +17,14 @@ This file is a record of one run. It is not a promise and not a target.
   [`prompt_version()`](../aturb/agent/prompt.py:58).
 - Agent: one model call per task, one attempt, no retry and no repair loop.
 
+**Qualification.** This baseline was measured under Phase 5 decision D7, which
+put the expected values of `project/expect/` into the prompt.
+[`docs/adr/0008-exclude-expectations-from-prompt.md`](adr/0008-exclude-expectations-from-prompt.md)
+supersedes D7: the expectation file is no longer sent to the agent. The score of
+0.60 and the prompt version `872c1e7cb85a7709` therefore describe the old
+information boundary, and a run made after ADR-0008 is not directly comparable
+to them without that qualification.
+
 ## The status and the score of every task
 
 | Task           | Part      | Status   | Score | Required checks that passed          |

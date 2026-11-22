@@ -26,19 +26,17 @@ HEX = re.compile(r"^[0-9a-f]{16}$")
 
 PACK_PROMPT = "Write the part in the language of this pack."
 REQUIREMENT = "Build a 120 x 60 x 5 mm plate with two 10 mm through holes."
-EXPECTATIONS = "volume = 35214.602"
 
 
 def test_the_sections_keep_their_order():
-    """The six sections appear in the order the prompt is built in."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    """The five sections appear in the order the prompt is built in."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     expected = "\n\n".join([
         CORE_INSTRUCTION.strip(),
         PACK_PROMPT,
         conventions_text().strip(),
         REQUIREMENT,
-        EXPECTATIONS,
         OUTPUT_CONTRACT.strip(),
     ])
 
@@ -46,12 +44,12 @@ def test_the_sections_keep_their_order():
 
 
 def test_the_sections_are_separated_by_one_blank_line():
-    """The six sections are joined with exactly one blank line."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    """The five sections are joined with exactly one blank line."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     sections = prompt.split("\n\n")
 
-    assert len(sections) == 6
+    assert len(sections) == 5
     assert "\n\n\n" not in prompt
 
 
@@ -70,13 +68,13 @@ def test_the_core_instruction_names_no_task():
 def test_an_empty_pack_prompt_is_refused():
     """A prompt without the instructions of the pack is refused."""
     with pytest.raises(ValueError):
-        compose_prompt("", REQUIREMENT, EXPECTATIONS)
+        compose_prompt("", REQUIREMENT)
 
 
 def test_an_empty_requirement_is_refused():
     """A prompt without the intent of the task is refused."""
     with pytest.raises(ValueError):
-        compose_prompt(PACK_PROMPT, "", EXPECTATIONS)
+        compose_prompt(PACK_PROMPT, "")
 
 
 def test_the_version_is_sixteen_hex_characters():
@@ -155,36 +153,36 @@ def test_a_text_with_only_a_closing_fence_is_unchanged():
 
 def test_the_prompt_carries_the_conventions():
     """The composed prompt holds the text of the project conventions."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     assert conventions_text().strip() in prompt
 
 
 def test_the_conventions_come_after_the_pack_prompt():
     """The conventions follow the prompt of the pack."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     assert prompt.index(PACK_PROMPT) < prompt.index(conventions_text().strip())
 
 
 def test_the_conventions_come_before_the_requirement():
     """The conventions come before the requirement of the task."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     assert prompt.index(conventions_text().strip()) < prompt.index(REQUIREMENT)
 
 
 def test_the_prompt_names_every_convention():
     """The prompt names the rules C1 to C6."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     for rule in ("C1", "C2", "C3", "C4", "C5", "C6"):
         assert rule in prompt
 
 
-def test_the_five_original_sections_keep_their_order():
-    """The five sections that were already there keep their order."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+def test_the_other_sections_keep_their_order():
+    """The sections around the conventions keep their order."""
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     positions = [
         prompt.index(section)
@@ -192,7 +190,6 @@ def test_the_five_original_sections_keep_their_order():
             CORE_INSTRUCTION.strip(),
             PACK_PROMPT,
             REQUIREMENT,
-            EXPECTATIONS,
             OUTPUT_CONTRACT.strip(),
         )
     ]
@@ -202,14 +199,13 @@ def test_the_five_original_sections_keep_their_order():
 
 def test_every_section_appears_once():
     """No section of the prompt is removed or duplicated."""
-    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    prompt = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     sections = (
         CORE_INSTRUCTION.strip(),
         PACK_PROMPT,
         conventions_text().strip(),
         REQUIREMENT,
-        EXPECTATIONS,
         OUTPUT_CONTRACT.strip(),
     )
 
@@ -219,28 +215,28 @@ def test_every_section_appears_once():
 
 def test_the_same_inputs_give_the_same_prompt():
     """The composition is deterministic."""
-    first = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
-    second = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    first = compose_prompt(PACK_PROMPT, REQUIREMENT)
+    second = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     assert first == second
 
 
 def test_the_same_inputs_give_the_same_version():
     """The same prompt always gives the same version."""
-    first = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
-    second = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    first = compose_prompt(PACK_PROMPT, REQUIREMENT)
+    second = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     assert prompt_version(first) == prompt_version(second)
 
 
 def test_the_version_changes_when_the_conventions_change(monkeypatch):
     """A different convention text gives a different prompt and version."""
-    first = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    first = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     monkeypatch.setattr(prompt_module, "conventions_text",
                         lambda: "C1 changed")
 
-    second = compose_prompt(PACK_PROMPT, REQUIREMENT, EXPECTATIONS)
+    second = compose_prompt(PACK_PROMPT, REQUIREMENT)
 
     assert first != second
     assert prompt_version(first) != prompt_version(second)
