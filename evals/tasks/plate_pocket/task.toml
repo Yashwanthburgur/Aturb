@@ -1,0 +1,6 @@
+# Task metadata for the Phase 7 pocket task.
+
+task_id = "plate_pocket"
+part_id = "plt0003"
+name = "Plate with a centred pocket and two through holes"
+description = "Build a 120 x 60 x 10 mm plate with a centred 40 x 20 mm pocket 4 mm deep and two 10 mm through holes at x = -40 and x = +40."

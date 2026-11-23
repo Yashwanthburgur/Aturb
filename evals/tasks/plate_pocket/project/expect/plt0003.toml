@@ -1,0 +1,12 @@
+# Expected measurements for the pocketed plate plt0003. Exactly five keys.
+# Hand volume: 120 x 60 x 10 - 40 x 20 x 4 - 2 x pi x 5^2 x 10
+# = 67229.2036732051 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 67229.20367320512 mm^3, bbox 120 x 60 x 10 mm, one valid solid,
+# two through-holes of 10 mm at x = -40 and x = +40 on y = 0.
+
+volume = 67229.20367320512
+bbox = [120.0, 60.0, 10.0]
+hole_count = 2
+hole_diameter = 10.0
+hole_positions = [[-40.0, 0.0], [40.0, 0.0]]

@@ -1,0 +1,7 @@
+# The correct answer for plate_pocket. Exactly five keys.
+
+task_id = "plate_pocket"
+part_id = "plt0003"
+expect_file = "expect/plt0003.toml"
+required_checks = ["volume", "bbox_x", "bbox_y", "bbox_z", "hole_count"]
+max_score = 1.0
