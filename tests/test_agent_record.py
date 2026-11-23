@@ -14,6 +14,14 @@ from pathlib import Path
 
 import pytest
 
+from aturb.agent.attempts import (
+    AttemptRecord,
+    attempts_path,
+    from_entry,
+    read_attempts,
+    write_attempts,
+)
+from aturb.agent.loop import AttemptEntry
 from aturb.agent.record import read_agent_runs, write_agent_runs
 from aturb.agent.types import ERROR, OK, AgentRun
 
@@ -195,3 +203,49 @@ def test_a_run_with_no_agent_run_gives_a_file_with_no_record(tmp_path):
     path = write_agent_runs(tmp_path, [])
 
     assert read_agent_runs(path) == []
+
+
+def _attempts() -> list[AttemptRecord]:
+    """Two attempts across tasks, with empty and non-empty failed checks."""
+    return [
+        AttemptRecord(
+            task_id="plate_2holes", part_id="plt0001", attempt=1,
+            prompt_version="first", input_tokens=100, output_tokens=20,
+            cost_usd=0.001, status=OK, outcome="passed", score=1.0,
+            failed_checks=(), error=""),
+        AttemptRecord(
+            task_id="plate_fillet", part_id="plt0002", attempt=2,
+            prompt_version="second", input_tokens=200, output_tokens=40,
+            cost_usd=0.0025, status="failed", outcome="checks_failed", score=0.6,
+            failed_checks=("volume", "hole_count"),
+            error='the checks did not pass: "volume"\\path\nsecond line\tand tab'),
+    ]
+
+
+def test_attempt_records_survive_the_round_trip(tmp_path):
+    """Attempts share the agent stamp and preserve all twelve fields."""
+    attempts = _attempts()
+    agent_path = tmp_path / "2026-11-22_235959_agent.toml"
+
+    path = write_attempts(attempts_path(agent_path), attempts)
+
+    assert path.name == "2026-11-22_235959_attempts.toml"
+    assert read_attempts(path) == attempts
+    records = tomllib.loads(path.read_text(encoding="utf-8"))["attempts"]
+    assert len(records) == 2
+    assert set(records[0]) == {
+        "task_id", "part_id", "attempt", "prompt_version", "input_tokens",
+        "output_tokens", "cost_usd", "status", "outcome", "score",
+        "failed_checks", "error",
+    }
+    assert records[0]["failed_checks"] == []
+    assert records[1]["failed_checks"] == ["volume", "hole_count"]
+
+
+def test_an_attempt_entry_converts_without_duplicate_mapping(tmp_path):
+    """The loop entry converts directly, and an empty sequence round-trips."""
+    expected = _attempts()[1]
+
+    assert from_entry(AttemptEntry(**vars(expected))) == expected
+    path = write_attempts(tmp_path / "empty_attempts.toml", [])
+    assert read_attempts(path) == []

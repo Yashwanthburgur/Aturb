@@ -135,3 +135,8 @@ def _string(value: str) -> str:
         else:
             parts.append(char)
     return '"' + "".join(parts) + '"'
+
+
+def toml_string(value: str) -> str:
+    """Expose the unchanged escaping to the other operator-record writer."""
+    return _string(value)
