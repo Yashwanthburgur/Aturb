@@ -24,10 +24,19 @@ DEFAULTS: dict[str, object] = {
     "max_input_tokens": 20000,  # starting default
     "max_output_tokens": 8000,  # starting default
     "max_cost_usd": 0.50,  # starting default
+    "max_attempts": 3,  # starting default
+    "max_total_cost_usd": 0.75,  # starting default
+    "max_total_input_tokens": 60_000,  # starting default
+    "max_total_output_tokens": 24_000,  # starting default
     "input_price_per_mtok": 0.0,  # starting default
     "output_price_per_mtok": 0.0,  # starting default
     "timeout_s": 120,  # starting default
 }
+
+LOOP_LIMITS = (
+    "max_attempts", "max_total_cost_usd", "max_total_input_tokens",
+    "max_total_output_tokens",
+)
 
 
 def agent_settings(cfg: dict) -> dict:
@@ -45,7 +54,20 @@ def agent_settings(cfg: dict) -> dict:
     for key in DEFAULTS:
         if key in section:
             settings[key] = section[key]
+    _validate_loop_limits(settings)
     return settings
+
+
+def _validate_loop_limits(settings: dict) -> None:
+    """Refuse non-numeric or negative cumulative bounds before a run starts."""
+    for key in LOOP_LIMITS:
+        value = settings[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise AgentError(f"the agent setting {key!r} must be a number")
+        minimum = 1 if key == "max_attempts" else 0
+        if value < minimum:
+            raise AgentError(
+                f"the agent setting {key!r} must be at least {minimum}")
 
 
 def read_api_key(settings: dict, env: Mapping[str, str] | None = None) -> str:

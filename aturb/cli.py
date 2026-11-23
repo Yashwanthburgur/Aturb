@@ -188,20 +188,18 @@ def _run_agent_eval(args: argparse.Namespace, cfg: dict, name: str,
                     packs_root: Path, runner: Runner, timeout: int) -> int:
     """Run the agent over a task set and score what it wrote.
 
-    Every task folder of the set is copied into the scratch area, the agent
-    writes one candidate there and the existing task runner builds and scores
-    that candidate. The results go to the dated result file of the run and the
-    agent runs go to the dated agent file next to it.
+    Every task is copied into the scratch area and run through the bounded loop.
+    Results, agent runs and per-attempt records go to dated files side by side.
 
     The exit codes are the ones of the plain run: 0 when every task is ok, 1
     when any task is failed or error, and 2 for a configuration or pack error.
     """
+    from aturb.agent.attempts import attempts_path, from_entry, write_attempts
     from aturb.agent.config import agent_settings
+    from aturb.agent.loop import run_agent_loop
     from aturb.agent.record import write_agent_runs
-    from aturb.agent.run import run_agent
     from aturb.agent.types import AgentError
     from aturb.evals.report import write_results
-    from aturb.evals.runner import run_task
     from aturb.packs import discover
 
     manifest = discover(packs_root)[name]
@@ -224,15 +222,17 @@ def _run_agent_eval(args: argparse.Namespace, cfg: dict, name: str,
         print(f"cannot read the task set {tasks_dir}: {exc}")
         return 2
 
-    results = []
-    runs = []
+    results, runs, attempts = [], [], []
     for folder in folders:
-        run = run_agent(folder, client, settings, manifest, work_dir)
-        runs.append(run)
-        results.append(run_task(work_dir / folder.name, runner, timeout))
+        loop = run_agent_loop(
+            folder, client, runner, settings, manifest, work_dir, timeout)
+        runs.append(loop.run)
+        results.append(loop.result)
+        attempts.extend(from_entry(entry) for entry in loop.attempts)
     try:
         write_results(results_dir, results)
-        write_agent_runs(results_dir, runs)
+        agent_path = write_agent_runs(results_dir, runs)
+        write_attempts(attempts_path(agent_path), attempts)
     except OSError as exc:
         print(f"cannot write the results in {results_dir}: {exc}")
         return 2

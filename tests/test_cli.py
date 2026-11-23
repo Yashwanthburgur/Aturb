@@ -1,14 +1,11 @@
-"""Tests for the aturb build and aturb check CLI using the stub pack.
-
-The stub pack copies the committed fixture, so the checks of the demo plate
-run over that fixture without a CAD.
-"""
+"""Tests for the command line interface using the stub pack."""
 
 from __future__ import annotations
 
 import shutil
 from pathlib import Path
 
+from aturb.agent.attempts import read_attempts
 from aturb.agent.record import read_agent_runs
 from aturb.agent.types import ModelRequest, ModelResponse
 from aturb.cli import main
@@ -221,13 +218,12 @@ def test_eval_with_a_malformed_config_returns_2(tmp_path, capsys):
 
 
 def test_eval_with_the_agent_returns_0(tmp_path, capsys, monkeypatch):
-    """The agent writes a candidate, the task is scored and the run returns 0."""
-    tasks = make_task_set(tmp_path)
-    client = _FakeClient()
+    """One configured attempt reproduces the single-shot agent path."""
+    tasks, client = make_task_set(tmp_path), _FakeClient()
     monkeypatch.setattr("aturb.cli._model_client", lambda settings: client)
+    config = write_config(tmp_path, "agent = { max_attempts = 1 }\n")
 
-    code = main(["eval", str(tasks), "--agent",
-                 "--config", str(write_config(tmp_path))])
+    code = main(["eval", str(tasks), "--agent", "--config", str(config)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -253,9 +249,8 @@ def test_eval_with_the_agent_on_a_malformed_task_set_returns_1(tmp_path, capsys,
 
 
 def test_eval_with_the_agent_writes_both_files(tmp_path, capsys, monkeypatch):
-    """The run writes the result file and the agent file into the results folder."""
-    tasks = make_task_set(tmp_path)
-    results = tmp_path / "elsewhere"
+    """The run writes results, agent runs and attempts with a shared stamp."""
+    tasks, results = make_task_set(tmp_path), tmp_path / "elsewhere"
     monkeypatch.setattr("aturb.cli._model_client",
                         lambda settings: _FakeClient())
 
@@ -266,10 +261,16 @@ def test_eval_with_the_agent_writes_both_files(tmp_path, capsys, monkeypatch):
     capsys.readouterr()
     assert code == 0
     agent_files = list(results.glob("*_agent.toml"))
-    assert len(list(results.glob("*.toml"))) == 2
+    attempt_files = list(results.glob("*_attempts.toml"))
+    assert len(list(results.glob("*.toml"))) == 3
+    assert attempt_files[0].name == agent_files[0].name.replace(
+        "_agent.toml", "_attempts.toml")
     runs = read_agent_runs(agent_files[0])
     assert [(run.task_id, run.status)
             for run in runs] == [("plate_2holes", "ok")]
+    attempts = read_attempts(attempt_files[0])
+    assert [(item.task_id, item.attempt, item.score)
+            for item in attempts] == [("plate_2holes", 1, 1.0)]
 
 
 def test_eval_without_the_agent_is_unchanged(tmp_path, capsys, monkeypatch):

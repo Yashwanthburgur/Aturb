@@ -20,6 +20,10 @@ DEFAULTS = {
     "max_input_tokens": 20000,
     "max_output_tokens": 8000,
     "max_cost_usd": 0.50,
+    "max_attempts": 3,
+    "max_total_cost_usd": 0.75,
+    "max_total_input_tokens": 60_000,
+    "max_total_output_tokens": 24_000,
     "input_price_per_mtok": 0.0,
     "output_price_per_mtok": 0.0,
     "timeout_s": 120,
@@ -33,6 +37,10 @@ OVERRIDES = {
     "max_input_tokens": 1234,
     "max_output_tokens": 567,
     "max_cost_usd": 1.25,
+    "max_attempts": 5,
+    "max_total_cost_usd": 2.5,
+    "max_total_input_tokens": 12345,
+    "max_total_output_tokens": 6789,
     "input_price_per_mtok": 0.15,
     "output_price_per_mtok": 0.60,
     "timeout_s": 45,
@@ -138,3 +146,23 @@ def test_the_key_is_in_no_error_message(env):
         read_api_key(settings, env)
 
     assert KEY not in str(excinfo.value)
+
+
+@pytest.mark.parametrize("key", [
+    "max_attempts", "max_total_cost_usd", "max_total_input_tokens",
+    "max_total_output_tokens",
+])
+def test_loop_limits_must_be_numbers(key):
+    """A boolean or text is not a numeric loop bound."""
+    for value in (True, "3"):
+        with pytest.raises(AgentError):
+            agent_settings({"agent": {key: value}})
+
+
+def test_loop_limits_have_a_positive_attempt_bound_and_nonnegative_caps():
+    """The attempt bound is at least one and cumulative caps are non-negative."""
+    for key, value in (("max_attempts", 0), ("max_total_cost_usd", -0.1),
+                       ("max_total_input_tokens", -1),
+                       ("max_total_output_tokens", -1)):
+        with pytest.raises(AgentError):
+            agent_settings({"agent": {key: value}})
