@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from aturb.agent.config import agent_settings
+from aturb.agent.loop import run_agent_loop
 from aturb.agent.run import run_agent
 from aturb.agent.types import ModelRequest, ModelResponse
 from aturb.config import load_config, timeout_s
@@ -53,17 +54,19 @@ REFUSED = "import os\n\n\ndef build(doc):\n    return None\n"
 
 
 class _FakeClient:
-    """A model client that answers with a canned candidate."""
+    """A model client that answers with one canned candidate or a sequence."""
 
-    def __init__(self, text: str) -> None:
-        """Take the candidate the client returns."""
-        self.text = text
+    def __init__(self, text: str | list[str]) -> None:
+        """Take the candidate or candidates the client returns."""
+        self.answers = [text] if isinstance(text, str) else text
         self.requests: list[ModelRequest] = []
 
     def complete(self, request: ModelRequest) -> ModelResponse:
-        """Record the request and return the canned candidate."""
+        """Record the request and return the next canned candidate."""
         self.requests.append(request)
-        return ModelResponse(text=self.text, input_tokens=120, output_tokens=45)
+        index = min(len(self.requests) - 1, len(self.answers) - 1)
+        return ModelResponse(
+            text=self.answers[index], input_tokens=120, output_tokens=45)
 
 
 def make_runner():
@@ -161,3 +164,30 @@ def test_the_agent_path_scores_the_fillet_task_with_freecad(tmp_path):
 
     # The committed task is never written to.
     assert _files(FILLET_TASK_DIR) == before
+
+
+@pytest.mark.freecad
+def test_the_loop_repairs_a_syntax_error_and_scores_with_freecad(tmp_path):
+    """A broken first candidate is repaired by the reference on attempt two."""
+    cfg = load_config(LOCAL_CONFIG)
+    runner = load_runner("freecad", cfg, default_packs_root())
+    broken = "def build(doc):\n    return (\n"
+    client = _FakeClient([broken, CANDIDATE])
+
+    loop = run_agent_loop(TASK_DIR, client, runner, make_settings(),
+                          FREECAD_PACK, tmp_path, timeout_s(cfg))
+    run = loop.run
+
+    assert run.status == "ok"
+    assert run.attempts == 2
+    assert len(loop.attempts) == 2
+    assert len(client.requests) == 2
+    assert loop.attempts[0].outcome == "build_failed:syntax_error"
+    assert loop.result.status == "ok", loop.result.error
+    assert loop.result.score == 1.0
+    assert "Build: failed (syntax_error)" in client.requests[1].prompt
+    steps = list((tmp_path / TASK_ID / "project" / "out").rglob("*.step"))
+    assert len(steps) == 1
+    model = load_step(steps[0])
+    assert model.is_valid
+    assert model.is_single_solid
