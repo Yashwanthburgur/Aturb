@@ -1,0 +1,13 @@
+# Expected measurements for the stepped filleted plate plt0004. Exactly five keys.
+# Hand volume: base + boss - four vertical corner fillets - two holes:
+# 120 x 60 x 5 + 60 x 60 x 3 - 4 x (4^2 - pi x 4^2 / 4) x 3
+# - 2 x pi x 5^2 x 5 = 45973.398283974864 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 45973.398283974864 mm^3, bbox 120 x 60 x 8 mm, one valid solid,
+# two through-holes of 10 mm at x = -40 and x = +40 on y = 0.
+
+volume = 45973.398283974864
+bbox = [120.0, 60.0, 8.0]
+hole_count = 2
+hole_diameter = 10.0
+hole_positions = [[-40.0, 0.0], [40.0, 0.0]]

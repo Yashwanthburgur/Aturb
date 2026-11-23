@@ -1,0 +1,7 @@
+# The correct answer for plate_step. Exactly five keys.
+
+task_id = "plate_step"
+part_id = "plt0004"
+expect_file = "expect/plt0004.toml"
+required_checks = ["volume", "bbox_x", "bbox_y", "bbox_z", "hole_count"]
+max_score = 1.0

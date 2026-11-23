@@ -1,0 +1,6 @@
+# Task metadata for the Phase 7 stepped fillet task.
+
+task_id = "plate_step"
+part_id = "plt0004"
+name = "Stepped plate with boss corner fillets and two through holes"
+description = "Build a 120 x 60 x 5 mm base with a centred 60 x 60 x 3 mm boss, 4 mm fillets on the four vertical boss corners, and two 10 mm through holes at x = -40 and x = +40."
