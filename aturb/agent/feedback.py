@@ -2,8 +2,9 @@
 
 The block tells the agent what its own candidate did: the outcome of the
 build, the sanitized error text and the traceback, the informational
-diagnostics, the advisory convention findings and the candidate-only geometry
-summary measured from the exported STEP of the candidate.
+diagnostics, the advisory convention findings, the candidate-only geometry
+summary measured from the exported STEP of the candidate and the source code of
+the candidate itself.
 
 It never carries an evaluator-derived field: no expected value, no tolerance,
 no check name, no verdict, no evaluator message, no score and no expectation
@@ -29,6 +30,10 @@ REPAIR_INSTRUCTION = (
 
 GEOMETRY_HEADER = "Candidate geometry (measured from the exported STEP):"
 
+PREVIOUS_HEADER = "Previous candidate:"
+
+FENCE = "```"
+
 INDENT = "  "
 
 
@@ -52,19 +57,22 @@ def feedback_text(
     diagnostics: Sequence[str] = (),
     conventions: Sequence[str] = (),
     geometry: CandidateGeometry | None = None,
+    previous_code: str = "",
 ) -> str:
     """Return the repair feedback block of one attempt, or an empty text.
 
-    The four inputs are candidate-side: the outcome of the build, the
-    informational diagnostics, the advisory convention findings and the
-    candidate-only geometry summary. There is no parameter for an expectation
-    path, an expectation dictionary or an answer spec, so an evaluator value
-    cannot reach the rendered text.
+    The five inputs are candidate-side: the outcome of the build, the
+    informational diagnostics, the advisory convention findings, the
+    candidate-only geometry summary and the source code of the candidate the
+    agent wrote on the previous attempt. There is no parameter for an
+    expectation path, an expectation dictionary or an answer spec, so an
+    evaluator value cannot reach the rendered text.
 
     The sections come in the order of the contract: the repair instruction, the
     build outcome, the error text and the traceback, the diagnostics, the
-    convention findings and the geometry summary. A section with nothing to say
-    is left out, and a block with nothing to say is an empty text.
+    convention findings, the geometry summary and the previous candidate. A
+    section with nothing to say is left out, and a block with nothing to say is
+    an empty text.
     """
     sections: list[str] = []
     if build is not None:
@@ -77,6 +85,7 @@ def feedback_text(
     _add(sections, _listed("Convention findings:", conventions))
     if build is not None and build.status == "ok" and geometry is not None:
         _add(sections, _geometry(geometry))
+    _add(sections, _previous(previous_code))
     if not sections:
         return ""
     return "\n\n".join([HEADER, REPAIR_INSTRUCTION, *sections])
@@ -124,6 +133,25 @@ def _geometry(geometry: CandidateGeometry) -> str:
             f"{INDENT}{INDENT}hole {index}: diameter {_number(hole.diameter)} mm, "
             f"position ({_number(hole.x)}, {_number(hole.y)}) mm")
     return "\n".join(lines)
+
+
+def _previous(code: str) -> str:
+    """Return the source code of the previous candidate, fenced and verbatim."""
+    text = code.strip()
+    if not text:
+        return ""
+    fence = _fence(text)
+    return f"{PREVIOUS_HEADER}\n\n{fence}\n{text}\n{fence}"
+
+
+def _fence(text: str) -> str:
+    """Return a fence of backticks that no line of the text can close."""
+    longest = 0
+    run = 0
+    for char in text:
+        run = run + 1 if char == "`" else 0
+        longest = max(longest, run)
+    return "`" * max(3, longest + 1)
 
 
 def _boolean(value: bool) -> str:

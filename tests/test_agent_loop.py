@@ -39,25 +39,19 @@ class _FakeClient:
                  output_tokens: int = 45) -> None:
         """Take the answers the client gives, one per call."""
         self.answers = list(answers) if answers else [GOOD]
-        self.input_tokens = input_tokens
-        self.output_tokens = output_tokens
+        self.input_tokens, self.output_tokens = input_tokens, output_tokens
         self.requests: list[ModelRequest] = []
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         """Record the request and answer with the next canned answer."""
         self.requests.append(request)
         index = min(len(self.requests) - 1, len(self.answers) - 1)
-        return ModelResponse(text=self.answers[index],
-                             input_tokens=self.input_tokens,
+        return ModelResponse(text=self.answers[index], input_tokens=self.input_tokens,
                              output_tokens=self.output_tokens)
 
 
-class _FailingClient:
+class _FailingClient(_FakeClient):
     """A client whose call always fails."""
-
-    def __init__(self) -> None:
-        """Start with no request."""
-        self.requests: list[ModelRequest] = []
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         """Record the request and fail."""
@@ -92,16 +86,14 @@ def _task_with_a_wrong_volume(tmp_path: Path) -> Path:
     task = tmp_path / "task" / TASK_ID
     shutil.copytree(TASK_DIR, task)
     expect = task / "project" / "expect" / "plt0001.toml"
-    text = expect.read_text(encoding="utf-8")
-    expect.write_text(text.replace("volume = 35214.602", "volume = 30000.0"),
-                      encoding="utf-8")
+    expect.write_text(expect.read_text(encoding="utf-8").replace(
+        "volume = 35214.602", "volume = 30000.0"), encoding="utf-8")
     return task
 
 
 def _files(folder: Path) -> set[str]:
     """Return the relative paths of every file under a folder."""
-    return {path.relative_to(folder).as_posix()
-            for path in folder.rglob("*") if path.is_file()}
+    return {path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file()}
 
 
 def test_the_starting_defaults_are_the_documented_ones():
@@ -110,8 +102,7 @@ def test_the_starting_defaults_are_the_documented_ones():
     assert DEFAULT_MAX_TOTAL_INPUT_TOKENS == 60_000
     assert DEFAULT_MAX_TOTAL_OUTPUT_TOKENS == 24_000
     assert DEFAULT_MAX_TOTAL_COST_USD == 0.75
-    assert UNREPAIRABLE_FAILURE_KINDS == frozenset(
-        {"runner_crash", "input_error"})
+    assert UNREPAIRABLE_FAILURE_KINDS == frozenset({"runner_crash", "input_error"})
 
 
 def test_the_first_attempt_passes(tmp_path):
@@ -156,6 +147,19 @@ def test_the_repair_prompt_carries_no_evaluator_value(tmp_path):
         assert name not in repair
 
 
+def test_the_repair_prompt_carries_the_previous_candidate(tmp_path):
+    """The repair prompt carries the source code of the previous candidate."""
+    client = _FakeClient(["# STUB: fail=syntax_error\n", GOOD])
+    _loop(tmp_path, client)
+    first, repair = client.requests[0].prompt, client.requests[1].prompt
+    assert "## Repair" not in first
+    assert "Previous candidate:" in repair
+    assert repair.index("# STUB: fail=syntax_error") > repair.index("Previous candidate:")
+    assert SENTINEL not in first
+    for name in CHECK_NAMES:
+        assert name not in first
+
+
 def test_the_loop_stops_at_the_attempt_limit(tmp_path):
     """The loop stops when the attempt limit is reached."""
     client = _FakeClient(["# STUB: fail=syntax_error\n"])
@@ -171,8 +175,7 @@ def test_the_loop_stops_at_the_attempt_limit(tmp_path):
 def test_the_loop_stops_before_the_model_when_the_token_budget_is_passed(tmp_path):
     """The cumulative token budget stops the loop before the next call."""
     client = _FakeClient(["# STUB: fail=syntax_error\n"])
-    loop = _loop(tmp_path, client, max_output_tokens=512,
-                 max_total_output_tokens=512)
+    loop = _loop(tmp_path, client, max_output_tokens=512, max_total_output_tokens=512)
     assert loop.stop_reason == "budget_exceeded"
     assert len(client.requests) == 1
     assert loop.run.attempts == 1
@@ -185,9 +188,8 @@ def test_the_loop_stops_before_the_model_when_the_token_budget_is_passed(tmp_pat
 def test_the_loop_stops_before_the_model_when_the_cost_budget_is_passed(tmp_path):
     """The cumulative cost budget stops the loop before the next call."""
     client = _FakeClient(["# STUB: fail=syntax_error\n"])
-    loop = _loop(tmp_path, client, max_output_tokens=512,
-                 output_price_per_mtok=1_000_000.0, max_cost_usd=1000.0,
-                 max_total_cost_usd=530.0)
+    loop = _loop(tmp_path, client, max_output_tokens=512, output_price_per_mtok=1_000_000.0,
+                 max_cost_usd=1000.0, max_total_cost_usd=530.0)
     assert loop.stop_reason == "budget_exceeded"
     assert len(client.requests) == 1
     assert "cost" in loop.attempts[-1].error
@@ -199,8 +201,7 @@ def test_the_last_judged_result_survives_a_budget_refusal(tmp_path):
     """A budget refusal after a judged attempt keeps the judged result (D10)."""
     task = _task_with_a_wrong_volume(tmp_path)
     client = _FakeClient()
-    loop = _loop(tmp_path, client, task=task, max_output_tokens=512,
-                 max_total_output_tokens=512)
+    loop = _loop(tmp_path, client, task=task, max_output_tokens=512, max_total_output_tokens=512)
     assert len(client.requests) == 1
     assert loop.stop_reason == "budget_exceeded"
     assert loop.result.status == "failed"
@@ -265,8 +266,7 @@ def test_one_attempt_reproduces_the_single_shot_path(tmp_path):
     """One attempt of the loop is the single-shot run."""
     client = _FakeClient()
     loop = _loop(tmp_path, client, max_attempts=1)
-    single = run_agent(TASK_DIR, _FakeClient(), _settings(), STUB_PACK,
-                       tmp_path / "single")
+    single = run_agent(TASK_DIR, _FakeClient(), _settings(), STUB_PACK, tmp_path / "single")
     assert loop.run.status == single.status
     assert loop.run.error == single.error
     assert loop.run.prompt_version == single.prompt_version
@@ -280,8 +280,7 @@ def test_one_attempt_reproduces_the_single_shot_path(tmp_path):
 def test_one_attempt_reproduces_the_failed_single_shot_path(tmp_path):
     """One attempt of the loop is the single-shot run that failed."""
     loop = _loop(tmp_path, _FailingClient(), max_attempts=1)
-    single = run_agent(TASK_DIR, _FailingClient(), _settings(), STUB_PACK,
-                       tmp_path / "single")
+    single = run_agent(TASK_DIR, _FailingClient(), _settings(), STUB_PACK, tmp_path / "single")
     assert loop.run.status == single.status == "error"
     assert loop.run.error == single.error
     assert loop.run.attempts == single.attempts == 1
@@ -293,5 +292,4 @@ def test_the_loop_leaves_the_committed_task_unchanged(tmp_path):
     _loop(tmp_path, _FakeClient())
     assert _files(TASK_DIR) == before
     scratch = tmp_path.resolve() / TASK_ID / "project" / "parts"
-    assert [path.name for path in scratch.iterdir()] == [
-        "plt0001_candidate.stub"]
+    assert [path.name for path in scratch.iterdir()] == ["plt0001_candidate.stub"]

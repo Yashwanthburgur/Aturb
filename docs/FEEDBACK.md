@@ -12,6 +12,10 @@ This document is CAD-neutral: it names no CAD, no CAD API and no backend, it
 does not restate the runner contract, and it holds no expected value of any
 task.
 
+The card T7.5.1 of Phase 7.5 added the source code of the previous candidate
+to the list of permitted inputs. Every other rule of this contract is
+unchanged.
+
 ## The two lists
 
 ### What the repair prompt may carry
@@ -33,6 +37,11 @@ produced by, or measured from, the candidate the agent itself wrote.
    of its own and never changes the score of a task.
 5. **The candidate-only geometry summary**, measured from the exported STEP of
    the candidate when the build status is `ok`. It is specified below.
+6. **The source code of the previous candidate.** The file the agent itself
+   wrote on the previous attempt, exactly as it was written. It is the
+   candidate's own text, so the next attempt can read its own code, find the
+   concrete mistake in it and fix it. It is never the reference part, never a
+   file of the evaluator and never an expectation file.
 
 ### What the repair prompt must never carry
 
@@ -85,13 +94,23 @@ or failed, and it reveals nothing about the number of checks the task has.
 ## The structural boundary
 
 **The formatter takes candidate-side inputs only.** The feedback formatter is
-called with four inputs and nothing else:
+called with five inputs and nothing else:
 
 - `build` — the build outcome: the status, the failure kind, the sanitized
   error text and the sanitized traceback;
 - `diagnostics` — the informational build diagnostics;
 - `conventions` — the advisory convention findings;
-- `geometry` — the candidate-only geometry summary.
+- `geometry` — the candidate-only geometry summary;
+- `previous_code` — the source code of the candidate the agent wrote on the
+  previous attempt.
+
+**The previous candidate is the agent's own text.** It is the file the agent
+wrote, so it is candidate-side by definition: it is never the reference part,
+never the expectation file and never any other file of the evaluator. Carrying
+it opens no path to an evaluator value, so
+[`docs/adr/0008-exclude-expectations-from-prompt.md`](adr/0008-exclude-expectations-from-prompt.md)
+still holds: the agent path still never reads `project/expect/`, and the
+evaluator stays the judge.
 
 **There is no evaluator input to pass.** The formatter has no parameter for an
 expectation path, no parameter for an expectation dictionary and no parameter
@@ -118,7 +137,12 @@ left out:
 4. the informational build diagnostics, when the build reported any;
 5. the advisory convention findings, when the checker found any;
 6. the candidate-only geometry summary, when the build status is `ok` and a
-   STEP file was exported.
+   STEP file was exported;
+7. the source code of the previous candidate, when the agent wrote one.
+
+The source code is fenced, so its indentation is preserved verbatim and the
+agent reads its own file exactly as it wrote it. The fence is a run of
+backticks long enough that no line of the code can close it.
 
 The block is empty when the candidate passed every check: there is nothing to
 repair, so the next attempt sends the prompt of the first one. The first
@@ -181,6 +205,36 @@ Candidate geometry (measured from the exported STEP):
 The numbers in this example are synthetic. They are not the expected values of
 any task, and they are not a target: the summary says what this candidate
 measures, not what it should measure. The convention finding is advisory.
+
+## Worked example 3 — a candidate that is carried back
+
+The candidate of the previous attempt is carried back verbatim, so the next
+attempt can read its own code and fix the mistake in it.
+
+````
+## Repair
+
+The previous file is replaced by the file you write now. The answer is still
+only the file.
+
+Build: failed (syntax_error)
+
+Error:
+  File "plt9001_base.py", line 12
+    width = 40
+SyntaxError: invalid syntax
+
+Previous candidate:
+
+```
+# the candidate of the previous attempt
+def build(doc):
+    return doc
+```
+````
+
+The code is the candidate's own text and nothing else. It names no check, no
+expected value and no tolerance, and it is not the reference part.
 
 ## Boundaries
 

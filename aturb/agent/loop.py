@@ -250,7 +250,7 @@ def _repair_feedback(prepared: PreparedTask, pack: PackManifest,
         prepared.part_id, pack.part_extension, outcome.candidate_text)
     return feedback_text(
         build, diagnostics=judgement.diagnostics, conventions=conventions,
-        geometry=judgement.geometry)
+        geometry=judgement.geometry, previous_code=outcome.candidate_text)
 
 
 def _entry(prepared: PreparedTask, attempt: int, outcome: AttemptOutcome,

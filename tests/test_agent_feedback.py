@@ -169,11 +169,11 @@ def test_the_repair_instruction_is_always_there():
 
 
 def test_the_formatter_takes_candidate_side_inputs_only():
-    """The formatter has four parameters and no evaluator parameter."""
+    """The formatter has five parameters and no evaluator parameter."""
     parameters = inspect.signature(feedback_text).parameters
 
     assert tuple(parameters) == (
-        "build", "diagnostics", "conventions", "geometry")
+        "build", "diagnostics", "conventions", "geometry", "previous_code")
 
 
 @pytest.mark.parametrize("keyword", FORBIDDEN_KEYWORDS)
@@ -211,5 +211,61 @@ def test_the_rendered_feedback_carries_no_expected_value_of_a_task():
     """No expected value of a committed task appears in the rendered block."""
     text = feedback_text(BuildFeedback(status="ok"), geometry=GEOMETRY)
 
+    for value in TASK_VALUES:
+        assert value not in text
+
+
+def test_the_previous_candidate_is_carried_back():
+    """The source code of the previous candidate is carried back verbatim."""
+    code = "def build(doc):\n    if doc:\n        return doc\n"
+
+    text = feedback_text(
+        BuildFeedback(status="failed", failure_kind="syntax_error"),
+        previous_code=code,
+    )
+
+    assert "Previous candidate:" in text
+    assert code.strip() in text
+    assert "```" in text
+    assert text.index("Previous candidate:") > text.index("Build: failed")
+
+
+def test_the_previous_candidate_comes_after_the_other_sections():
+    """The previous candidate is the last section of the block."""
+    text = feedback_text(
+        BuildFeedback(status="ok"),
+        diagnostics=["a diagnostic"],
+        conventions=["C2: a finding"],
+        geometry=GEOMETRY,
+        previous_code="# the candidate of the previous attempt\n",
+    )
+
+    assert "Previous candidate:" in text
+    assert text.index("Previous candidate:") > text.index("Diagnostics:")
+    assert text.index("Previous candidate:") > text.index(
+        "Convention findings:")
+    assert text.index("Previous candidate:") > text.index("Candidate geometry")
+
+
+def test_an_empty_previous_candidate_is_left_out():
+    """A block with no previous candidate carries no previous candidate."""
+    assert "Previous candidate:" not in feedback_text(
+        BuildFeedback(status="ok"), previous_code="")
+    assert "Previous candidate:" not in feedback_text(
+        BuildFeedback(status="ok"), previous_code="   \n  ")
+
+
+def test_the_previous_candidate_leaks_no_evaluator_term():
+    """The repair instruction stays and no evaluator term crosses over."""
+    text = feedback_text(
+        BuildFeedback(status="ok"),
+        geometry=GEOMETRY,
+        previous_code="# the candidate of the previous attempt\n",
+    )
+
+    assert "replaced by the file you write now" in text
+    assert "only the file" in text
+    for forbidden in FORBIDDEN_TEXTS:
+        assert forbidden not in text
     for value in TASK_VALUES:
         assert value not in text
