@@ -18,6 +18,12 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import unquote, urlsplit
 
+from clients.viewer.generate_api import (
+    ApiError,
+    GenerateHandler,
+    read_requirement,
+    run_generation,
+)
 from clients.viewer.mesh import MeshError, tessellate_step
 from clients.viewer.workspace import (
     DECLARED_ARTIFACT_KINDS,
@@ -44,6 +50,7 @@ MIME_TYPES = {
 
 ENCODED_TRAVERSAL = ("%2e", "%2f", "%5c")
 FILE_PREFIX = "/api/files/"
+GENERATE_PATH = "/api/generate"
 ASSET_MISSING = "the requested asset is not available"
 
 
@@ -109,6 +116,33 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 self._serve_file(path[len(FILE_PREFIX):])
             else:
                 self._serve_asset(path[1:])
+        except Exception:
+            if not self._responded:
+                self._send_json(
+                    500, {"error": "the request could not be answered"})
+
+    def do_POST(self) -> None:
+        """Answer one mutating request.
+
+        Only the generation endpoint exists. The local host and the local
+        origin are checked before the body is read, so a request from another
+        page never reaches the generation service. A refused request closes
+        the connection, because its body is never read.
+        """
+        self._responded = False
+        try:
+            if urlsplit(self.path).path != GENERATE_PATH:
+                raise ApiError(404, "unknown endpoint")
+            requirement = read_requirement(
+                self.headers, self.rfile, self.viewer.bound_port,
+                self.viewer.generate_handler)
+            outcome = run_generation(self.viewer.generate_handler, requirement)
+            if outcome.workspace is not None:
+                self.viewer.set_workspace(outcome.workspace)
+            self._send_json(outcome.status, outcome.payload)
+        except ApiError as exc:
+            self.close_connection = True
+            self._send_json(exc.status, {"error": exc.message})
         except Exception:
             if not self._responded:
                 self._send_json(
@@ -212,24 +246,28 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self._responded = True
         self.wfile.write(body)
+        self.wfile.flush()
 
 
 class ViewerServer(ThreadingHTTPServer):
     """The loopback-only HTTP server of the viewer.
 
-    It holds the open workspace and the directory of the bundled browser
-    assets. The workspace can be swapped while the server runs.
+    It holds the open workspace, the directory of the bundled browser assets
+    and the optional generation service. The workspace can be swapped while
+    the server runs.
     """
 
     daemon_threads = True
     allow_reuse_address = True
 
     def __init__(self, workspace: LoadedWorkspace, port: int = DEFAULT_PORT,
-                 static_dir: Path | None = None, host: str = LOOPBACK_HOST):
+                 static_dir: Path | None = None, host: str = LOOPBACK_HOST,
+                 generate_handler: GenerateHandler | None = None):
         """Bind the server to the loopback address."""
         self.workspace = workspace
         self.static_dir = Path(
             static_dir) if static_dir is not None else STATIC_DIR
+        self.generate_handler = generate_handler
         super().__init__((_check_loopback(host), port), ViewerHandler)
 
     @property
@@ -237,6 +275,11 @@ class ViewerServer(ThreadingHTTPServer):
         """Return the loopback URL the server is bound to."""
         host, port = self.server_address[:2]
         return f"http://{host}:{port}/"
+
+    @property
+    def bound_port(self) -> int:
+        """Return the port the server is bound to."""
+        return int(self.server_address[1])
 
     def set_workspace(self, workspace: LoadedWorkspace) -> None:
         """Open another workspace without restarting the server."""
@@ -248,6 +291,7 @@ def create_server(
     port: int | None = None,
     static_dir: Path | None = None,
     host: str = LOOPBACK_HOST,
+    generate_handler: GenerateHandler | None = None,
 ) -> ViewerServer:
     """Bind the viewer server to the loopback address and return it.
 
@@ -257,7 +301,7 @@ def create_server(
     if chosen < 0 or chosen > MAX_PORT:
         raise ValueError(
             f"the port must be between 0 and {MAX_PORT}, got {chosen}")
-    return ViewerServer(workspace, chosen, static_dir, host)
+    return ViewerServer(workspace, chosen, static_dir, host, generate_handler)
 
 
 def serve_in_thread(server: ViewerServer) -> threading.Thread:
@@ -284,5 +328,4 @@ def _has_encoded_traversal(raw_path: str) -> bool:
 def _download_name(path: Path) -> str:
     """Return a safe download file name for an artifact."""
     name = path.name.replace('"', "_").replace("\\", "_")
-    name = name.replace("\r", "_").replace("\n", "_")
-    return name or "artifact"
+    return name.replace("\r", "_").replace("\n", "_") or "artifact"
