@@ -121,9 +121,8 @@ class HttpModelClient:
             raise AgentError(
                 f"the {self._label()} response is not a JSON object")
         answer = _response_text(payload)
-        if answer is None:
-            raise AgentError(
-                f"the {self._label()} response has no generated text")
+        if not answer:
+            raise AgentError(self._empty_text_error(payload))
         usage = payload.get("usage")
         if not isinstance(usage, dict):
             raise AgentError(
@@ -152,15 +151,41 @@ class HttpModelClient:
             return message
         return message.replace(self.api_key, REDACTED)
 
+    def _empty_text_error(self, payload: dict[str, Any]) -> str:
+        """Explain an empty answer when the response says why it is empty."""
+        first = _first_choice(payload)
+        message = first.get("message")
+        message = message if isinstance(message, dict) else {}
+        finish = first.get("finish_reason")
+        reasoning = message.get(
+            "reasoning_content") or message.get("reasoning")
+        has_reasoning = isinstance(reasoning, str) and bool(reasoning.strip())
+        if finish != "length" and not has_reasoning:
+            return f"the {self._label()} response has no generated text"
+        usage = payload.get("usage")
+        tokens = usage.get("completion_tokens") if isinstance(
+            usage, dict) else None
+        suffix = f" (completion_tokens={tokens})" if _is_count(tokens) else ""
+        if finish == "length":
+            return (f"the {self._label()} response hit the output-token limit "
+                    f"(finish_reason=length) during reasoning before emitting "
+                    f"final text{suffix}")
+        return (f"the {self._label()} response ended during reasoning before "
+                f"emitting final text (finish_reason={finish or 'unknown'}){suffix}")
+
+
+def _first_choice(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return the first choice object, or an empty object when it is absent."""
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return {}
+    first = choices[0]
+    return first if isinstance(first, dict) else {}
+
 
 def _response_text(payload: dict[str, Any]) -> str | None:
     """Return the generated text, or None when the response does not hold it."""
-    choices = payload.get("choices")
-    if not isinstance(choices, list) or not choices:
-        return None
-    first = choices[0]
-    if not isinstance(first, dict):
-        return None
+    first = _first_choice(payload)
     message = first.get("message")
     if not isinstance(message, dict):
         return None

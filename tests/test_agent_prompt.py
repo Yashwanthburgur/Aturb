@@ -258,11 +258,11 @@ def test_the_prompt_without_feedback_is_the_phase_six_prompt():
 
 
 @pytest.mark.parametrize("task, part, version", [
-    ("plate_2holes", "plt0001", "25830ef6f36acf93"),
-    ("plate_fillet", "plt0002", "ca0607a60b7eacb6"),
+    ("plate_2holes", "plt0001", "9e23f5e3af8db9d8"),
+    ("plate_fillet", "plt0002", "b10c463b8cc296fc"),
 ])
 def test_the_committed_prompt_versions_are_unchanged(task, part, version):
-    """The prompt of every committed task keeps its Phase 6 version."""
+    """The prompt of every committed task keeps its current deterministic version."""
     pack_prompt = (REPO_ROOT / "packs" / "freecad" / "prompt"
                    / "agent.md").read_text(encoding="utf-8")
     requirement = (REPO_ROOT / "evals" / "tasks" / task / "project"

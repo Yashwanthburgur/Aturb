@@ -32,7 +32,7 @@ def _request(model: str = MODEL, max_output_tokens: int = 256) -> ModelRequest:
 def _answer(text: str = "the answer", input_tokens: int = 12, output_tokens: int = 7) -> str:
     """Return a response body that holds the fields the API notes record."""
     return json.dumps({
-        "choices": [{"message": {"role": "assistant", "content": text}}],
+        "choices": [{"message": {"content": text, "reasoning_content": "thinking"}}],
         "usage": {"prompt_tokens": input_tokens, "completion_tokens": output_tokens},
     })
 
@@ -97,7 +97,6 @@ def test_a_good_response_becomes_a_model_response():
     client = _client(_FakeTransport(_answer()))
 
     response = client.complete(_request())
-
     assert response.text == "the answer"
     assert response.input_tokens == 12
     assert response.output_tokens == 7
@@ -172,18 +171,30 @@ def test_the_default_transport_is_the_http_one():
     assert client.transport is http_transport
 
 
-def test_a_response_without_text_raises():
-    """A response without the generated text is refused."""
+@pytest.mark.parametrize("content, finish, reasoning, expected", [
+    ("", "stop", "", "has no generated text"),
+    (None, "length", "still reasoning", "output-token limit"),
+    ("", "length", "still reasoning", "output-token limit"),
+])
+def test_an_empty_response_has_a_specific_diagnostic(
+        content, finish, reasoning, expected):
+    """Empty text keeps its generic error unless reasoning exhaustion is visible."""
     body = json.dumps({
-        "choices": [{"message": {"role": "assistant"}}],
+        "choices": [{
+            "finish_reason": finish,
+            "message": {"content": content, "reasoning_content": reasoning},
+        }],
         "usage": {"prompt_tokens": 12, "completion_tokens": 7},
     })
     client = _client(_FakeTransport(body))
-
     with pytest.raises(AgentError) as excinfo:
         client.complete(_request())
-
-    assert "text" in str(excinfo.value)
+    message = str(excinfo.value)
+    assert expected in message
+    if finish == "length":
+        assert "finish_reason=length" in message
+        assert "during reasoning before emitting final text" in message
+        assert "completion_tokens=7" in message
 
 
 def test_a_response_without_choices_raises():

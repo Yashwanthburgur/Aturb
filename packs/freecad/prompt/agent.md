@@ -51,6 +51,10 @@ is the row that verified it.
 Use `PartDesign::Pocket` for through-holes. `PartDesign::Hole` does not cut
 material in headless FreeCAD 1.0.1 (T1.26).
 
+- For a plate spanning `Z = 0` to `Z = THICKNESS_MM`, put the pocket sketch on
+  the top face (`Z = THICKNESS_MM`) so the default `-Z` cut enters the solid.
+  At `Z = 0`, set `pocket.Reversed = True`; the default `-Z` cut enters empty air.
+
 The names you pass to `fillet.Base` come from the selection helper below, not
 from a position you assume.
 
