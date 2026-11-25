@@ -10,3 +10,4 @@ Architecture decision records, one per decision, 10 to 20 lines each.
 - [ADR-0008: Exclude expectations from the prompt](0008-exclude-expectations-from-prompt.md) — the expected values of the evaluator never reach the prompt.
 - [ADR-0009: The bounded improvement loop](0009-bounded-improvement-loop.md) — the agent may try again a bounded number of times, and the repair feedback carries only what the candidate itself measures.
 - [ADR-0010: Expectation-free arbitrary-prompt generation](0010-arbitrary-prompt-generation.md) — arbitrary requirements generate source and measured artifacts without evaluation fixtures or a correctness score, with isolated output on every attempt.
+- [ADR-0011: Live STEP viewer and the client boundary](0011-live-step-viewer-and-client-boundary.md) — the browser viewer, the loopback-only server and the UI live in `clients/viewer/`; the core stays neutral, and the mesh comes from the verified neutral STEP tessellation.
