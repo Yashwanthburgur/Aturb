@@ -53,7 +53,12 @@ def main(argv: list[str] | None = None) -> int:
     evaluate.add_argument("--results-dir", default=None)
     evaluate.add_argument("--agent", action="store_true")
     add_generate_parser(sub)
+    view = sub.add_parser("view")
+    view.add_argument("workspace")
     args = parser.parse_args(argv)
+    if args.command == "view":
+        from clients.viewer.cli import run_view_command
+        return run_view_command(args)
 
     try:
         cfg = load_config(Path(args.config) if args.config else None)
