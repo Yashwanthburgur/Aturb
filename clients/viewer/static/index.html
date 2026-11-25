@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATURB viewer</title>
+<link rel="stylesheet" href="/viewer.css">
+</head>
+<body>
+<div class="app">
+  <main class="viewport" id="viewport">
+    <canvas id="viewport-canvas"></canvas>
+    <div class="toolbar" id="toolbar">
+      <div class="tool-group" role="group" aria-label="View mode">
+        <button type="button" class="tool-button is-active" data-mode="shaded">Shaded</button>
+        <button type="button" class="tool-button" data-mode="shaded-edges">Shaded + Edges</button>
+        <button type="button" class="tool-button" data-mode="wireframe">Wireframe</button>
+      </div>
+      <div class="tool-group" role="group" aria-label="Overlays">
+        <button type="button" class="tool-button is-active" data-toggle="axes">Axes</button>
+        <button type="button" class="tool-button is-active" data-toggle="box">Bounding Box</button>
+      </div>
+      <button type="button" class="tool-button tool-reset" id="reset-view">Reset View</button>
+    </div>
+    <div class="viewport-overlay" id="viewport-overlay" hidden>
+      <p class="overlay-title" id="overlay-title"></p>
+      <p class="overlay-detail" id="overlay-detail"></p>
+    </div>
+    <div class="status-bar" id="status-bar">
+      <span id="status-text">Loading the workspace...</span>
+      <span class="status-hint">Drag to orbit &middot; Shift+drag to pan &middot; Wheel to zoom</span>
+    </div>
+  </main>
+  <aside class="inspector" id="inspector">
+    <header class="inspector-header">
+      <h1>ATURB viewer</h1>
+      <span class="badge" id="status-badge">unknown</span>
+    </header>
+    <section class="panel-section" id="run-panel">
+      <h2>Run</h2>
+      <dl class="fact-list" id="run-facts"></dl>
+    </section>
+    <section class="panel-section" id="usage-panel">
+      <h2>Usage</h2>
+      <dl class="fact-list" id="usage-facts"></dl>
+      <p class="note" id="usage-note" hidden></p>
+    </section>
+    <section class="panel-section" id="build-panel">
+      <h2>Build outcome</h2>
+      <dl class="fact-list" id="build-facts"></dl>
+      <p class="error-text" id="build-error" hidden></p>
+      <h3>Advisory convention findings</h3>
+      <ul class="finding-list" id="convention-list"></ul>
+    </section>
+    <section class="panel-section" id="geometry-panel">
+      <h2>Measured geometry</h2>
+      <dl class="fact-list" id="geometry-facts"></dl>
+      <h3>Holes</h3>
+      <ul class="hole-list" id="hole-list"></ul>
+    </section>
+    <section class="panel-section" id="artifacts-panel">
+      <h2>Artifacts</h2>
+      <ul class="artifact-list" id="artifact-list"></ul>
+    </section>
+    <section id="prompt-panel" class="panel-section" hidden></section>
+  </aside>
+</div>
+<script src="/math3d.js"></script>
+<script src="/viewer.js"></script>
+<script src="/inspector.js"></script>
+</body>
+</html>
