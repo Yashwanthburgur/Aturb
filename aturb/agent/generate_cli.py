@@ -82,6 +82,7 @@ def format_generate_report(result: GenerateResult) -> str:
     if result.failure_kind:
         lines.append(f"Failure kind: {result.failure_kind}")
     lines.extend([
+        f"Workspace: {_workspace_path(result.workspace)}",
         "Saved files:",
         f"  source: {_relative(result.workspace, result.part_path) or 'not produced'}",
         f"  STEP: {_relative(result.workspace, result.step_path) or 'not produced'}",
@@ -151,6 +152,15 @@ def _relative(workspace: Path, path: Path | None) -> str:
     if path is None:
         return ""
     return path.resolve().relative_to(workspace.resolve()).as_posix()
+
+
+def _workspace_path(workspace: Path) -> str:
+    """Return the workspace relative to the current directory when it is inside
+    it, and as it is when it is outside."""
+    try:
+        return workspace.resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except (OSError, ValueError):
+        return str(workspace)
 
 
 def _strings(items) -> str:

@@ -118,7 +118,40 @@ def test_report_renders_geometry_holes_conventions_and_errors(tmp_path):
     failed = format_generate_report(_result(tmp_path / "failed", ok=False))
     assert "Failure kind: syntax_error" in failed
     assert "Error:" in failed and "part.stub" in failed
-    assert "C:\\" not in failed
+    error_line = next(line for line in failed.splitlines()
+                      if line.startswith("Error:"))
+    assert "C:\\" not in error_line
+
+
+def test_report_prints_the_workspace_relative_when_it_is_inside_the_current(
+        tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    workspace = tmp_path / "evals" / "tmp" / "generate" / "2026-11-25_095531"
+    report = format_generate_report(_result(workspace))
+    assert "Workspace: evals/tmp/generate/2026-11-25_095531" in report
+    assert str(tmp_path) not in report
+
+
+def test_report_prints_the_workspace_as_it_is_when_it_is_outside_the_current(
+        tmp_path, monkeypatch):
+    current = tmp_path / "current"
+    current.mkdir()
+    monkeypatch.chdir(current)
+    workspace = tmp_path / "outside"
+    report = format_generate_report(_result(workspace))
+    assert f"Workspace: {workspace.resolve()}" in report
+
+
+def test_the_manifest_of_a_workspace_outside_the_current_has_no_absolute_path(
+        tmp_path, monkeypatch):
+    current = tmp_path / "current"
+    current.mkdir()
+    monkeypatch.chdir(current)
+    workspace = tmp_path / "outside"
+    path = write_generate_manifest(_result(workspace))
+    text = path.read_text(encoding="utf-8")
+    assert str(tmp_path) not in text
+    assert ":/" not in text and ":\\" not in text
 
 
 def test_command_accepts_positional_prompt_out_and_attempt_override(
