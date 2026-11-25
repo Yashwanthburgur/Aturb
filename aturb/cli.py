@@ -19,6 +19,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from aturb.agent.generate_cli import add_generate_parser, run_generate_command
 from aturb.config import ConfigError, active_pack, load_config, timeout_s
 from aturb.contract.runner import Runner
 from aturb.contract.types import BuildRequest, BuildResult
@@ -51,10 +52,13 @@ def main(argv: list[str] | None = None) -> int:
     evaluate.add_argument("--config", default=None)
     evaluate.add_argument("--results-dir", default=None)
     evaluate.add_argument("--agent", action="store_true")
+    add_generate_parser(sub)
     args = parser.parse_args(argv)
 
     try:
         cfg = load_config(Path(args.config) if args.config else None)
+        if args.command == "generate":
+            return run_generate_command(args, cfg, default_packs_root(), _model_client)
         name = active_pack(cfg)
         packs_root = default_packs_root()
         runner = load_runner(name, cfg, packs_root)
