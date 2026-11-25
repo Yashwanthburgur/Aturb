@@ -258,8 +258,8 @@ def test_the_prompt_without_feedback_is_the_phase_six_prompt():
 
 
 @pytest.mark.parametrize("task, part, version", [
-    ("plate_2holes", "plt0001", "9e23f5e3af8db9d8"),
-    ("plate_fillet", "plt0002", "b10c463b8cc296fc"),
+    ("plate_2holes", "plt0001", "28ec29c9b71dda14"),
+    ("plate_fillet", "plt0002", "988da7114e37c376"),
 ])
 def test_the_committed_prompt_versions_are_unchanged(task, part, version):
     """The prompt of every committed task keeps its current deterministic version."""

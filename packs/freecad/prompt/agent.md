@@ -47,6 +47,17 @@ is the row that verified it.
 | `fillet.Base = (feature, names)`                                                  | Choose the edges to fillet            | T1.25            |
 | `fillet.Radius = value`                                                           | Set the radius of a fillet            | T1.25            |
 | `body.newObject("PartDesign::Pocket", "Holes")` with `pocket.Type = "ThroughAll"` | Cut through-holes                     | T1.26            |
+| `pocket.Type = "Length"` and `pocket.Length = value`                              | Cut a blind pocket that leaves a floor | T10.01           |
+| `body.newObject("PartDesign::Pad", "Boss")` a second time in the same Body        | Add a boss on top of the first pad    | T10.01           |
+| `sk.Placement = App.Placement(App.Vector(0, 0, 0), App.Rotation(App.Vector(1, 0, 0), 90))` | Put a sketch on the XZ plane          | T10.01           |
+| `pad.Midplane = True`                                                             | Extrude equally to both sides of the sketch plane | T10.01           |
+| `body.newObject("PartDesign::Chamfer", "Chamfer")`                                | Create a chamfer                      | T10.01           |
+| `chamfer.Base = (feature, names)`                                                 | Choose the edges to chamfer           | T10.01           |
+| `chamfer.Size = value`                                                            | Set the size of a chamfer             | T10.01           |
+| `body.newObject("PartDesign::Revolution", "Revolution")`                          | Create a revolution                   | T10.01           |
+| `revolution.Profile = sketch`                                                     | Set the profile of a revolution       | T10.01           |
+| `revolution.ReferenceAxis = (sketch, ["V_Axis"])`                                 | Revolve around the vertical axis of the sketch | T10.01           |
+| `revolution.Angle = 360.0`                                                        | Revolve the whole way round           | T10.01           |
 
 Use `PartDesign::Pocket` for through-holes. `PartDesign::Hole` does not cut
 material in headless FreeCAD 1.0.1 (T1.26).
@@ -116,6 +127,30 @@ fillet.Radius = FILLET_RADIUS_MM
 
 `LENGTH_MM`, `WIDTH_MM` and `FILLET_RADIUS_MM` are your own constants, and
 `pad` is the feature whose shape you selected on.
+
+## Multi-feature parts
+
+One Body holds the whole part. Build the features in the order the material
+appears: the base first, then what stands on it, then what is cut out of it.
+
+- **Boss.** Pad the base, then pad the boss from a second sketch on the top
+  face of the base. The second Pad fuses with the first one.
+- **Blind pocket.** Put the pocket sketch on the face the pocket opens in and
+  set `pocket.Type = "Length"` with `pocket.Length` for the depth. The pocket
+  cuts along the sketch normal, so the sketch must sit on the material.
+- **Orthogonal wall (L-bracket).** Sketch the wall on the XZ plane with
+  `App.Rotation(App.Vector(1, 0, 0), 90)`: the sketch local X axis is the
+  global X axis and the local Y axis is the global Z axis. Pad it with
+  `pad.Midplane = True` to spread it equally to both sides of the sketch plane.
+- **Chamfer.** Find the edge with the helper (`helper.vertical_edges` and
+  `helper.edge_points`), never by an assumed index, then give the name to
+  `chamfer.Base` and set `chamfer.Size`.
+- **Revolved shaft.** Draw a closed half-profile on one side of the axis
+  (`r >= 0`, never crossing it), set `revolution.ReferenceAxis =
+  (sketch, ["V_Axis"])` and `revolution.Angle = 360.0`.
+
+A `ThroughAll` pocket cuts along the sketch normal, so the sketch of a
+through-hole must sit on the top of the material it has to pass through.
 
 ## Output contract
 
