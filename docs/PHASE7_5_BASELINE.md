@@ -293,7 +293,7 @@ this date; a new run may score differently and may write a different candidate.
 
 Four tasks are four tasks. This run is a measurement of one model on four
 plates, and it does not claim that the agent has general mechanical engineering
-autonomy: two of the four tasks passed on the first attempt, one was judged
+autonomy: two of the four tasks passed on the first attempt, one was attempted
 twice without a lift, and one never produced a candidate at all. The repair
 loop with the previous candidate is bounded, and this run shows that it lifted
 nothing on these four tasks.
