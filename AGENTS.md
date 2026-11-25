@@ -26,7 +26,11 @@ Read `docs/ARCHITECTURE.md` before changing structure.
 5. Never put a CAD brand name or CAD concept inside `aturb/`.
 6. Pack helpers may select, measure and assert. They may never create features.
 7. Never guess a library API. Verify with a tiny command first. Use only calls recorded in `docs/api_notes/` or verified in-session.
-8. Files at most 300 lines. Changes at most ~200 lines per task.
+8. Python source files: 300 lines is a soft cohesion guideline (a warning in
+   `tools/size_limit.py`) and 500 lines is the hard ceiling. Split files by
+   responsibility and cohesion, never artificially just to stay under 300 lines.
+   Documentation (`docs/*.md`) and browser assets are not hard-gated by
+   `tools/size_limit.py`. Changes at most ~200 lines per task.
 9. No absolute paths or machine-specific values in committed files. Use config.
 10. Mark every chosen default with `# starting default`.
 11. Do not commit. Report `git status --short` and acceptance output.

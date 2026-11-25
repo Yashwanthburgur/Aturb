@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from size_limit import find_oversized  # noqa: E402
+from size_limit import HARD_LIMIT, SOFT_LIMIT, find_oversized, main  # noqa: E402
 
 
 def _write_lines(path: Path, count: int) -> None:
@@ -44,3 +44,49 @@ def test_missing_scanned_folder_does_not_raise(tmp_path: Path) -> None:
     offenders = find_oversized(tmp_path)
 
     assert offenders == []
+
+
+def test_a_file_at_the_soft_limit_passes(tmp_path: Path, capsys) -> None:
+    """A file at the soft guideline passes and prints the OK line."""
+    _write_lines(tmp_path / "aturb" / "exact.py", SOFT_LIMIT)
+
+    code = main(tmp_path)
+
+    assert code == 0
+    assert "size_limit: OK" in capsys.readouterr().out
+
+
+def test_a_file_above_the_soft_limit_warns_and_passes(
+        tmp_path: Path, capsys) -> None:
+    """A file above the soft guideline warns and still exits 0."""
+    _write_lines(tmp_path / "aturb" / "long.py", SOFT_LIMIT + 1)
+
+    code = main(tmp_path)
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert (f"WARNING: aturb/long.py has {SOFT_LIMIT + 1} lines "
+            f"(soft guideline: {SOFT_LIMIT})") in out
+
+
+def test_a_file_at_the_hard_limit_only_warns(tmp_path: Path, capsys) -> None:
+    """A file exactly at the hard ceiling is a warning, not a failure."""
+    _write_lines(tmp_path / "aturb" / "edge.py", HARD_LIMIT)
+
+    code = main(tmp_path)
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "WARNING: aturb/edge.py" in out
+    assert "FAIL" not in out
+
+
+def test_a_file_above_the_hard_limit_fails(tmp_path: Path, capsys) -> None:
+    """A file above the hard ceiling fails with exit code 1."""
+    _write_lines(tmp_path / "aturb" / "huge.py", HARD_LIMIT + 1)
+
+    code = main(tmp_path)
+
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "FAIL: aturb/huge.py" in out
