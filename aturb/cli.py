@@ -259,13 +259,7 @@ def _model_client(settings: dict) -> ModelClient:
     from aturb.agent.model import HttpModelClient
 
     key = read_api_key(settings)
-    return HttpModelClient(
-        base_url=settings["base_url"],
-        model=settings["model"],
-        api_key=key,
-        timeout=float(settings["timeout_s"]),
-        provider=settings["provider"],
-    )
+    return HttpModelClient.from_settings(settings, key)
 
 
 def _results_dir(args: argparse.Namespace, tasks_dir: Path) -> Path:

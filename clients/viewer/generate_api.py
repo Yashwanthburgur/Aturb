@@ -204,9 +204,7 @@ class GenerateService:
 
 def _default_client_factory(settings: dict, api_key: str) -> ModelClient:
     """Build the model client of the configuration, on the server only."""
-    return HttpModelClient(
-        base_url=settings["base_url"], model=settings["model"], api_key=api_key,
-        timeout=float(settings["timeout_s"]), provider=settings["provider"])
+    return HttpModelClient.from_settings(settings, api_key)
 
 
 def _safe(text: str, settings: dict | None) -> str:
