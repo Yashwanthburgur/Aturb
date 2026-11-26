@@ -1,8 +1,8 @@
 /* The engineering inspector of the ATURB viewer.
  *
- * Reads the manifest and the mesh of the open workspace and fills the facts
- * panel. Every manifest string reaches the page through textContent, never
- * through innerHTML, so a manifest cannot inject markup.
+ * Reads the manifest, the mesh and the revision history of the open workspace
+ * and fills the facts panel. Every manifest string reaches the page through
+ * textContent only, so a manifest cannot inject markup.
  */
 (function (global) {
   "use strict";
@@ -13,6 +13,7 @@
   ];
   var manifest = {};
   var mesh = null;
+  var state = { editable: false, active_revision: null, has_history: false };
   function byId(id) { return document.getElementById(id); }
   function text(value, fallback) {
     return value === null || value === undefined || value === "" ? fallback : String(value);
@@ -55,6 +56,7 @@
     fact(list, "Part ID", text(manifest.part_id, "not recorded"));
     fact(list, "Attempts", String(number(manifest.attempts, 0)));
     fact(list, "Prompt version", text(manifest.prompt_version, "not called"));
+    if (state.active_revision) { fact(list, "Active revision", state.active_revision); }
     var badge = byId("status-badge");
     if (badge) {
       badge.textContent = status;
@@ -151,6 +153,9 @@
     renderArtifacts();
     renderStatus();
   }
+  function objectOf(result) {
+    return result.ok && result.body && typeof result.body === "object" ? result.body : {};
+  }
   function fetchJson(path) {
     return fetch(path, { headers: { Accept: "application/json" } })
       .then(function (response) {
@@ -164,24 +169,41 @@
         return { ok: false, status: 0, body: { error: String(error && error.message ? error.message : error) } };
       });
   }
-  /* Re-read the manifest and the mesh and update the panel and the viewport. */
+  /* Re-read the manifest, the mesh and the history, then update the panel, the
+   * viewport and the revision list. */
   function reload() {
-    return Promise.all([fetchJson("/api/manifest"), fetchJson("/api/mesh")]).then(function (results) {
-      var manifestResult = results[0];
+    return Promise.all([
+      fetchJson("/api/manifest"),
+      fetchJson("/api/mesh"),
+      fetchJson("/api/history")
+    ]).then(function (results) {
       var meshResult = results[1];
-      manifest = manifestResult.ok && manifestResult.body && typeof manifestResult.body === "object" ? manifestResult.body : {};
+      manifest = objectOf(results[0]);
       mesh = meshResult.ok && meshResult.body && Array.isArray(meshResult.body.positions) ? meshResult.body : null;
+      var history = objectOf(results[2]);
+      state.editable = history.editable === true;
+      state.active_revision = typeof history.active_revision === "string" ? history.active_revision : null;
+      state.has_history = history.has_history === true;
       renderAll();
+      refreshHistory(history);
       var viewer = global.AturbViewer;
-      if (!viewer) { return { manifest: manifest, mesh: mesh }; }
+      if (!viewer) { return { manifest: manifest, mesh: mesh, history: history }; }
       if (mesh) {
         viewer.setMesh(mesh);
       } else {
         viewer.setEmptyState(text(meshResult.body && meshResult.body.error, "the mesh request answered " + meshResult.status));
       }
-      return { manifest: manifest, mesh: mesh };
+      return { manifest: manifest, mesh: mesh, history: history };
     });
   }
-  global.AturbApp = { reload: reload };
+  /* Hand the history to the revision panel and tell the prompt panel what the
+   * open workspace allows. */
+  function refreshHistory(history) {
+    var panel = global.AturbHistory;
+    if (panel && typeof panel.reload === "function") { panel.reload(history); }
+    var prompt = global.AturbPrompt;
+    if (prompt && typeof prompt.refresh === "function") { prompt.refresh(); }
+  }
+  global.AturbApp = { reload: reload, state: state };
   if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", reload); } else { reload(); }
 })(window);
