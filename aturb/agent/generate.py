@@ -23,6 +23,7 @@ from aturb.contract.types import BuildRequest, FailureKind
 from aturb.evals.judge import CandidateGeometry, sanitize_text, summarize_geometry
 from aturb.packs import PackManifest
 from aturb.verify.step import StepLoadError, load_step
+from aturb.workspace.paths import PathEscapeError, resolve_inside
 
 DEFAULT_PART_ID = "part0001"  # starting default
 UNREPAIRABLE_FAILURE_KINDS = frozenset(
@@ -147,6 +148,7 @@ def _generate(requirement, workspace, client, runner, settings, pack,
             return finish("error", "model_error", outcome.error)
 
         step_path = native_path = None
+        candidate = None
         geometry = None
         diagnostics: tuple[str, ...] = ()
         out_part = project / "out" / part_id
@@ -219,7 +221,8 @@ def _generate(requirement, workspace, client, runner, settings, pack,
             return finish("error", "unrepairable", build_fb.error_text)
         feedback = feedback_text(
             build_fb, diagnostics=diagnostics, conventions=conventions,
-            geometry=geometry, previous_code=outcome.candidate_text)
+            geometry=geometry, previous_code=outcome.candidate_text,
+            step_path=candidate)
     return finish("error", "max_attempts", "the generation made no attempt")
 
 
@@ -275,9 +278,9 @@ def _artifact(project: Path, relative: str | None) -> Path | None:
     if not relative:
         return None
     try:
-        path = (project / relative).resolve()
-        if not path.is_relative_to(project) or not path.is_file():
+        path = resolve_inside(project, relative)
+        if not path.is_file():
             return None
-    except (OSError, ValueError):
+    except (PathEscapeError, OSError, ValueError):
         return None
     return path

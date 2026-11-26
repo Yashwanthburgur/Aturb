@@ -9,12 +9,20 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import fields
+from pathlib import Path
 from typing import Any
 
 import pytest
+from build123d import Box, Cylinder, Location, export_step
 
-from aturb.agent.feedback import BuildFeedback, feedback_text
+from aturb.agent import feedback as feedback_module
+from aturb.agent.feedback import (
+    MAX_ADVISORY_FINDINGS,
+    BuildFeedback,
+    feedback_text,
+)
 from aturb.evals.judge import CandidateGeometry, HoleSummary
+from aturb.verify.engineering import DfmFinding, EngineeringReport
 
 FORBIDDEN_FIELDS = (
     "passed",
@@ -169,11 +177,12 @@ def test_the_repair_instruction_is_always_there():
 
 
 def test_the_formatter_takes_candidate_side_inputs_only():
-    """The formatter has five parameters and no evaluator parameter."""
+    """The formatter has six parameters and no evaluator parameter."""
     parameters = inspect.signature(feedback_text).parameters
 
     assert tuple(parameters) == (
-        "build", "diagnostics", "conventions", "geometry", "previous_code")
+        "build", "diagnostics", "conventions", "geometry", "previous_code",
+        "step_path")
 
 
 @pytest.mark.parametrize("keyword", FORBIDDEN_KEYWORDS)
@@ -269,3 +278,109 @@ def test_the_previous_candidate_leaks_no_evaluator_term():
         assert forbidden not in text
     for value in TASK_VALUES:
         assert value not in text
+
+
+def _step_with_overlapping_holes(tmp_path: Path) -> Path:
+    """Write a STEP file whose two holes overlap."""
+    part = Box(40, 40, 10)
+    part = part - Cylinder(5, 12).locate(Location((4, 0, 0)))
+    part = part - Cylinder(5, 12).locate(Location((-4, 0, 0)))
+    path = tmp_path / "overlapping.step"
+    export_step(part, str(path))
+    return path
+
+
+def _report(findings: tuple[DfmFinding, ...]) -> EngineeringReport:
+    """Return an engineering report that holds the given findings."""
+    return EngineeringReport(
+        bbox_min=(-20.0, -20.0, -5.0), bbox_max=(20.0, 20.0, 5.0),
+        bbox_size=(40.0, 40.0, 10.0), volume=1000.0, surface_area=100.0,
+        center_of_mass=(0.0, 0.0, 0.0), hole_count=2,
+        min_hole_spacing_mm=1.0, min_edge_margin_mm=1.0, dfm_findings=findings)
+
+
+def test_the_feedback_without_a_step_path_keeps_its_earlier_shape():
+    """Without a STEP path the diagnostics and the conventions keep their sections."""
+    text = feedback_text(
+        BuildFeedback(status="ok"),
+        diagnostics=["the model rebuilt the shape"],
+        conventions=["C2: the parameter block is missing"],
+    )
+
+    assert "Diagnostics:" in text
+    assert "Convention findings:" in text
+    assert "Advisory findings:" not in text
+
+
+def test_the_engineering_findings_join_the_advisory_findings(tmp_path):
+    """The diagnostics, the conventions and the DFM finding are one list."""
+    step = _step_with_overlapping_holes(tmp_path)
+
+    text = feedback_text(
+        BuildFeedback(status="ok"),
+        diagnostics=["the model rebuilt the shape"],
+        conventions=["C2: the parameter block is missing"],
+        step_path=step,
+    )
+
+    assert "Advisory findings:" in text
+    assert "DFM1 (error):" in text
+    assert "the model rebuilt the shape" in text
+    assert "C2: the parameter block is missing" in text
+    assert text.index("DFM1 (error):") < text.index(
+        "the model rebuilt the shape")
+
+
+def test_an_error_finding_comes_before_a_warning_finding(tmp_path, monkeypatch):
+    """The errors are ranked above the warnings."""
+    step = tmp_path / "part.step"
+    step.write_text("a step", encoding="utf-8")
+    report = _report((DfmFinding("DFM2", "warning", "a thin ligament"),
+                      DfmFinding("DFM1", "error", "the holes overlap")))
+    monkeypatch.setattr(feedback_module, "analyze_step", lambda path: report)
+
+    text = feedback_text(BuildFeedback(status="ok"), step_path=step)
+
+    assert text.index("DFM1 (error):") < text.index("DFM2 (warning):")
+
+
+def test_the_advisory_findings_are_capped(tmp_path, monkeypatch):
+    """More findings than the cap are cut and the rest are counted."""
+    step = tmp_path / "part.step"
+    step.write_text("a step", encoding="utf-8")
+    findings = tuple(
+        DfmFinding(f"DFM{index}", "warning", f"finding {index}")
+        for index in range(1, MAX_ADVISORY_FINDINGS + 4))
+    monkeypatch.setattr(
+        feedback_module, "analyze_step", lambda path: _report(findings))
+
+    text = feedback_text(BuildFeedback(status="ok"), step_path=step)
+
+    assert text.count("DFM") == MAX_ADVISORY_FINDINGS
+    assert "... and 3 more advisory finding(s)" in text
+
+
+def test_a_stub_step_never_fails_the_feedback(tmp_path):
+    """A file that is not a STEP holds no finding and never fails the repair."""
+    stub = tmp_path / "part.step"
+    stub.write_text("not a STEP", encoding="utf-8")
+
+    text = feedback_text(BuildFeedback(status="ok"), step_path=stub)
+
+    assert "Build: ok" in text
+    assert "Advisory findings:" not in text
+
+
+def test_a_failed_build_reads_no_step(tmp_path, monkeypatch):
+    """A build that failed never reads the STEP file of the candidate."""
+
+    def fail(path):
+        raise AssertionError("the STEP file of a failed build was read")
+
+    monkeypatch.setattr(feedback_module, "analyze_step", fail)
+
+    text = feedback_text(
+        BuildFeedback(status="failed", failure_kind="syntax_error"),
+        step_path=tmp_path / "part.step")
+
+    assert "Build: failed (syntax_error)" in text

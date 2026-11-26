@@ -13,7 +13,7 @@ from pathlib import Path
 
 from aturb.agent.config import DEFAULTS
 from aturb.agent.conventions import check_conventions
-from aturb.agent.feedback import BuildFeedback, feedback_text
+from aturb.agent.feedback import BuildFeedback, candidate_step, feedback_text
 from aturb.agent.prompt import compose_prompt
 from aturb.agent.run import (
     AttemptOutcome,
@@ -250,7 +250,8 @@ def _repair_feedback(prepared: PreparedTask, pack: PackManifest,
         prepared.part_id, pack.part_extension, outcome.candidate_text)
     return feedback_text(
         build, diagnostics=judgement.diagnostics, conventions=conventions,
-        geometry=judgement.geometry, previous_code=outcome.candidate_text)
+        geometry=judgement.geometry, previous_code=outcome.candidate_text,
+        step_path=candidate_step(prepared.scratch / "project", prepared.part_id))
 
 
 def _entry(prepared: PreparedTask, attempt: int, outcome: AttemptOutcome,
