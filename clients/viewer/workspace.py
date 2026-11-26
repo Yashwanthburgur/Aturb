@@ -10,6 +10,11 @@ the root are all refused.
 A manifest from a failed generation is still a manifest. An absent or empty
 artifact yields no artifact for that kind and every other field is kept, so
 the viewer can show what went wrong instead of showing nothing.
+
+A workspace that keeps a revision history is opened through its active
+revision: the history names the revision, the revision holds the manifest and
+the artifacts, and the outer folder stays the owner of the history. A plain
+workspace is read exactly as it was before.
 """
 
 from __future__ import annotations
@@ -19,7 +24,10 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+from aturb.agent.revisions import RevisionError, active_revision_dir, load_history
+
 DECLARED_ARTIFACT_KINDS = ("part_file", "step_file", "native_file")
+HISTORY_FILE_NAME = "history.toml"
 
 
 class WorkspaceError(ValueError):
@@ -42,11 +50,23 @@ class LoadedWorkspace:
     `result.toml`, with every field it holds. The artifacts hold one entry per
     declared kind: the verified path inside the root, or None when the
     manifest leaves that kind empty or absent.
+
+    The history root is the outer folder that owns `history.toml`, and the
+    active revision is the revision that history names. Both are empty for a
+    plain workspace that was never edited, so every caller that builds a
+    workspace by hand keeps working unchanged.
     """
 
     root: Path
     manifest: dict[str, Any]
     artifacts: dict[str, Path | None]
+    history_root: Path | None = None
+    active_revision: str | None = None
+
+    def __post_init__(self) -> None:
+        """Default the history root to the root of the workspace."""
+        if self.history_root is None:
+            object.__setattr__(self, "history_root", Path(self.root))
 
 
 def resolve_workspace_path(root: Path, rel_path: str) -> Path:
@@ -77,8 +97,13 @@ def resolve_workspace_path(root: Path, rel_path: str) -> Path:
 def load_workspace(workspace_dir: Path) -> LoadedWorkspace:
     """Read the manifest of a workspace and resolve its declared artifacts.
 
-    Raises ``WorkspaceError`` when the directory, the manifest or a declared
-    path is missing, malformed or outside the workspace.
+    A workspace that keeps a `history.toml` is read through the revision the
+    history names: the manifest and the artifacts come from that revision and
+    the root of the loaded workspace is the revision folder. A plain workspace
+    is read exactly as it was before.
+
+    Raises ``WorkspaceError`` when the directory, the manifest, the history or
+    a declared path is missing, malformed or outside the workspace.
     """
     directory = Path(workspace_dir)
     if not directory.exists():
@@ -90,12 +115,33 @@ def load_workspace(workspace_dir: Path) -> LoadedWorkspace:
     except OSError as exc:
         raise WorkspaceError(
             f"the workspace {directory} cannot be resolved") from exc
-    manifest = _read_manifest(root / "result.toml")
+    manifest_root, active = _active_revision(root)
+    manifest = _read_manifest(manifest_root / "result.toml")
     artifacts = {
-        kind: _resolve_declared(root, manifest.get(kind), kind)
+        kind: _resolve_declared(manifest_root, manifest.get(kind), kind)
         for kind in DECLARED_ARTIFACT_KINDS
     }
-    return LoadedWorkspace(root=root, manifest=manifest, artifacts=artifacts)
+    return LoadedWorkspace(
+        root=manifest_root, manifest=manifest, artifacts=artifacts,
+        history_root=root, active_revision=active)
+
+
+def _active_revision(root: Path) -> tuple[Path, str | None]:
+    """Return the folder to read and the active revision of a workspace.
+
+    A workspace without a history is read as it stands. A workspace with a
+    history is read through the revision the history names, and a history that
+    cannot be trusted is refused.
+    """
+    if not (root / HISTORY_FILE_NAME).is_file():
+        return root, None
+    try:
+        history = load_history(root)
+        revision_dir = active_revision_dir(root)
+    except RevisionError as exc:
+        raise WorkspaceError(
+            f"the history of the workspace is not usable: {exc}") from exc
+    return revision_dir, history.active_revision
 
 
 def resolve_artifact(workspace: LoadedWorkspace, kind: str) -> Path:
