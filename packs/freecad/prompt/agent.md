@@ -148,6 +148,19 @@ appears: the base first, then what stands on it, then what is cut out of it.
 - **Revolved shaft.** Draw a closed half-profile on one side of the axis
   (`r >= 0`, never crossing it), set `revolution.ReferenceAxis =
   (sketch, ["V_Axis"])` and `revolution.Angle = 360.0`.
+- **Triangular gusset rib.** Sketch the triangle on the XZ plane and pad it
+  with `pad.Midplane = True`. A rib that only touches the wall and the base
+  flush still fuses into one solid (T11.01).
+- **Stepped bore.** Cut the wide blind counterbore with `pocket.Type =
+  "Length"` and the narrow through-bore with `pocket.Type = "ThroughAll"`,
+  both from the same top face. Either order gives the same solid (T11.01).
+- **Bolt circle.** Put the hole centres on a pitch circle with `math.cos` and
+  `math.sin` of `2 * pi * index / count`, and cut them all with one
+  `ThroughAll` pocket (T11.01).
+- **Hollow enclosure.** Cut the blind cavity from the top face with
+  `pocket.Type = "Length"`, then drill the floor from the cavity floor. The
+  outer corner fillets may come before or after the cavity; when they come
+  after, `fillet.Base` takes the pocket (T11.01).
 
 A `ThroughAll` pocket cuts along the sketch normal, so the sketch of a
 through-hole must sit on the top of the material it has to pass through.
