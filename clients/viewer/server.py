@@ -1,10 +1,10 @@
 """Serve the open workspace over loopback-only HTTP.
 
 The viewer is a local, single-user tool: the server binds to the loopback
-address, it answers read-only requests only, and it never writes into the
-workspace. The request never carries a path: it names a kind or a browser
-asset, and the server resolves both itself. Every error is a structured JSON
-body that names no path of the host.
+address and it never writes into the workspace itself. The request never
+carries a path: it names a kind, a browser asset or an endpoint, and the
+server resolves all three itself. Every error is a structured JSON body that
+names no path of the host.
 """
 
 from __future__ import annotations
@@ -18,6 +18,15 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import unquote, urlsplit
 
+from clients.viewer.edit_api import (
+    EditHandler,
+    RollbackHandler,
+    read_edit_instruction,
+    read_history_payload,
+    read_rollback_revision,
+    run_edit,
+    run_rollback,
+)
 from clients.viewer.generate_api import (
     ApiError,
     GenerateHandler,
@@ -51,6 +60,9 @@ MIME_TYPES = {
 ENCODED_TRAVERSAL = ("%2e", "%2f", "%5c")
 FILE_PREFIX = "/api/files/"
 GENERATE_PATH = "/api/generate"
+HISTORY_PATH = "/api/history"
+EDIT_PATH = "/api/edit"
+ROLLBACK_PATH = "/api/rollback"
 ASSET_MISSING = "the requested asset is not available"
 
 
@@ -78,7 +90,7 @@ def resolve_port(env: Mapping[str, str] | None = None) -> int:
 class ViewerHandler(BaseHTTPRequestHandler):
     """The request handler of the viewer server.
 
-    Every route is read-only: a request names a kind or an asset, never a path.
+    A request names a kind, an asset or an endpoint, never a path.
     """
 
     server_version = "ATURBViewer/1.0"
@@ -110,6 +122,9 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 self._serve_asset("index.html")
             elif path == "/api/manifest":
                 self._send_json(200, self.viewer.workspace.manifest)
+            elif path == HISTORY_PATH:
+                self._send_json(200, read_history_payload(
+                    self.viewer.workspace))
             elif path == "/api/mesh":
                 self._serve_mesh()
             elif path.startswith(FILE_PREFIX):
@@ -124,19 +139,35 @@ class ViewerHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         """Answer one mutating request.
 
-        Only the generation endpoint exists. The local host and the local
-        origin are checked before the body is read, so a request from another
-        page never reaches the generation service. A refused request closes
-        the connection, because its body is never read.
+        The generation, the edit and the rollback endpoints exist. The local
+        host and the local origin are checked before the body is read, so a
+        request from another page never reaches a service. A refused request
+        closes the connection, because its body is never read.
         """
         self._responded = False
         try:
-            if urlsplit(self.path).path != GENERATE_PATH:
+            path = urlsplit(self.path).path
+            if path == GENERATE_PATH:
+                requirement = read_requirement(
+                    self.headers, self.rfile, self.viewer.bound_port,
+                    self.viewer.generate_handler)
+                outcome = run_generation(
+                    self.viewer.generate_handler, requirement)
+            elif path == EDIT_PATH:
+                instruction = read_edit_instruction(
+                    self.headers, self.rfile, self.viewer.bound_port,
+                    self.viewer.edit_handler)
+                outcome = run_edit(
+                    self.viewer.edit_handler, self.viewer.workspace, instruction)
+            elif path == ROLLBACK_PATH:
+                revision_id = read_rollback_revision(
+                    self.headers, self.rfile, self.viewer.bound_port,
+                    self.viewer.rollback_handler)
+                outcome = run_rollback(
+                    self.viewer.rollback_handler, self.viewer.workspace,
+                    revision_id)
+            else:
                 raise ApiError(404, "unknown endpoint")
-            requirement = read_requirement(
-                self.headers, self.rfile, self.viewer.bound_port,
-                self.viewer.generate_handler)
-            outcome = run_generation(self.viewer.generate_handler, requirement)
             if outcome.workspace is not None:
                 self.viewer.set_workspace(outcome.workspace)
             self._send_json(outcome.status, outcome.payload)
@@ -253,8 +284,8 @@ class ViewerServer(ThreadingHTTPServer):
     """The loopback-only HTTP server of the viewer.
 
     It holds the open workspace, the directory of the bundled browser assets
-    and the optional generation service. The workspace can be swapped while
-    the server runs.
+    and the optional generation, edit and rollback services. The workspace can
+    be swapped while the server runs.
     """
 
     daemon_threads = True
@@ -262,12 +293,16 @@ class ViewerServer(ThreadingHTTPServer):
 
     def __init__(self, workspace: LoadedWorkspace, port: int = DEFAULT_PORT,
                  static_dir: Path | None = None, host: str = LOOPBACK_HOST,
-                 generate_handler: GenerateHandler | None = None):
+                 generate_handler: GenerateHandler | None = None,
+                 edit_handler: EditHandler | None = None,
+                 rollback_handler: RollbackHandler | None = None):
         """Bind the server to the loopback address."""
         self.workspace = workspace
         self.static_dir = Path(
             static_dir) if static_dir is not None else STATIC_DIR
         self.generate_handler = generate_handler
+        self.edit_handler = edit_handler
+        self.rollback_handler = rollback_handler
         super().__init__((_check_loopback(host), port), ViewerHandler)
 
     @property
@@ -292,6 +327,8 @@ def create_server(
     static_dir: Path | None = None,
     host: str = LOOPBACK_HOST,
     generate_handler: GenerateHandler | None = None,
+    edit_handler: EditHandler | None = None,
+    rollback_handler: RollbackHandler | None = None,
 ) -> ViewerServer:
     """Bind the viewer server to the loopback address and return it.
 
@@ -301,7 +338,8 @@ def create_server(
     if chosen < 0 or chosen > MAX_PORT:
         raise ValueError(
             f"the port must be between 0 and {MAX_PORT}, got {chosen}")
-    return ViewerServer(workspace, chosen, static_dir, host, generate_handler)
+    return ViewerServer(workspace, chosen, static_dir, host, generate_handler,
+                        edit_handler, rollback_handler)
 
 
 def serve_in_thread(server: ViewerServer) -> threading.Thread:
