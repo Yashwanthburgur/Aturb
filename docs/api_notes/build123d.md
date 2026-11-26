@@ -64,6 +64,16 @@ the same fixture; they are the calls that `aturb/verify/engineering.py` uses.
 | `solid.center(CenterOf.BOUNDING_BOX)`            | Middle of the bounding box of a solid      | Asymmetric L: `Vector: (X=0, Y=0, Z=0)` — not the mass centre                                        |
 | `solid.center(CenterOf.GEOMETRY)`                | Geometric centre of a solid                | Raises `ValueError: Center of GEOMETRY is not supported for this object`                             |
 | `compound.center(CenterOf.MASS)`                 | Mass centroid of several solids            | Three 10 mm boxes: `Vector: (X=-3.33333, Y=3.33333, Z=0)`                                            |
+| `Location((x, y, z))`                            | Build a translation                        | `Location: (position=(5, 0, 0), orientation=(0, 0, 0))`                                              |
+| `Location((x, y, z), (rx, ry, rz))`              | Build a translation and a rotation in degrees | `Location((100, 0, 0), (0, 0, 45))` -> `center()` = `Vector: (X=100, Y=0, Z=0)`                    |
+| `Rotation(rx, ry, rz)`                           | Build a rotation in degrees                | `Rotation(0, 0, 45)` -> `Rotation: (position=(0, 0, 0), orientation=(0, 0, 45))`                     |
+| `Location * Rotation`                            | Compose a translation with a rotation      | `Location((1, 2, 3)) * Rotation(0, 0, 45)` -> `Location: (position=(1, 2, 3), orientation=(0, 0, 45))` |
+| `solid.moved(Location(...))`                     | Place a solid and leave the original alone | `Solid.moved(Location((0, 0, 10)))` -> a new `Solid`, `center()` = `Vector: (X=0, Y=0, Z=10)`; the original keeps `Vector: (X=0, Y=0, Z=0)` |
+| `compound.volume`                                | Volume of the solids in a compound         | Two 10 mm boxes -> `1999.9999999999995`                                                              |
+| `compound.bounding_box()`                        | Bounding box around every solid of a compound | Two boxes 30 mm apart -> `min` = `Vector: (X=-5, Y=-5, Z=-5)`, `max` = `Vector: (X=35, Y=5, Z=5)` |
+| `Solid & Solid` on two solids read from STEP     | Intersection of two real solids            | Touching: `None`; overlapping by 3 mm: a `Solid` with `volume` = `21128.761101961518`                |
+| `shape.distance_to(other)` for a bore and a pin  | Radial gap between a bore and its pin      | `Box(40, 40, 10) - Cylinder(10.2, 20)` and `Cylinder(10.0, 20)` -> `0.19999999999999854`             |
+| `export_step(compound, path)` then `import_step(path)` | Round trip of a compound of placed solids | `Compound` with `solids()` = 2 and the same `volume` = `70429.20367320506`                          |
 
 ## Notes from verification
 
@@ -116,3 +126,13 @@ the same fixture; they are the calls that `aturb/verify/engineering.py` uses.
   `shape.solids()` when the static type of the shape is `Shape`.
 - `bounding_box().min` and `bounding_box().max` are `Vector` objects, like
   `bounding_box().size`.
+- `Location(position, orientation)` turns the shape about its own origin first
+  and moves it afterwards: `Box(10, 10, 10).moved(Location((100, 0, 0), (0, 0, 45)))`
+  reports `center()` = `Vector: (X=100, Y=0, Z=0)`.
+- `moved` returns a new shape and leaves the shape it was called on alone;
+  `locate` changes the shape it is called on. Use `moved` when the original has
+  to stay where it was.
+- `Solid & Solid` answers `None` when two solids read from a STEP file only
+  touch, and a `Solid` when they share material.
+- `Compound.volume` is the sum of the volumes of its solids, and
+  `Compound.bounding_box()` is the box around all of them.
