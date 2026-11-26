@@ -15,6 +15,11 @@ A workspace that keeps a revision history is opened through its active
 revision: the history names the revision, the revision holds the manifest and
 the artifacts, and the outer folder stays the owner of the history. A plain
 workspace is read exactly as it was before.
+
+An assembly workspace is the output folder of one assembly. It holds an
+`assembly_result.toml` instead of a `result.toml`, and it declares the
+compound STEP file of the assembly. It is read the same way, so the viewer
+draws the whole assembly and never one part of it.
 """
 
 from __future__ import annotations
@@ -25,9 +30,15 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from aturb.agent.revisions import RevisionError, active_revision_dir, load_history
+from clients.viewer.assembly_api import (
+    AssemblyWorkspaceError,
+    is_assembly_workspace,
+    read_assembly_manifest,
+)
 
 DECLARED_ARTIFACT_KINDS = ("part_file", "step_file", "native_file")
 HISTORY_FILE_NAME = "history.toml"
+MANIFEST_FILE_NAME = "result.toml"
 
 
 class WorkspaceError(ValueError):
@@ -116,7 +127,7 @@ def load_workspace(workspace_dir: Path) -> LoadedWorkspace:
         raise WorkspaceError(
             f"the workspace {directory} cannot be resolved") from exc
     manifest_root, active = _active_revision(root)
-    manifest = _read_manifest(manifest_root / "result.toml")
+    manifest = _read_manifest(manifest_root)
     artifacts = {
         kind: _resolve_declared(manifest_root, manifest.get(kind), kind)
         for kind in DECLARED_ARTIFACT_KINDS
@@ -164,10 +175,20 @@ def resolve_artifact(workspace: LoadedWorkspace, kind: str) -> Path:
     return resolved
 
 
-def _read_manifest(path: Path) -> dict[str, Any]:
-    """Read and parse the manifest of a workspace."""
+def _read_manifest(folder: Path) -> dict[str, Any]:
+    """Read and parse the manifest of a workspace.
+
+    A workspace holds a `result.toml`. An assembly workspace holds an
+    `assembly_result.toml` instead, and it is read the same way.
+    """
+    path = folder / MANIFEST_FILE_NAME
     if not path.is_file():
-        raise WorkspaceError(f"no result.toml in the workspace {path.parent}")
+        if is_assembly_workspace(folder):
+            try:
+                return read_assembly_manifest(folder)
+            except AssemblyWorkspaceError as exc:
+                raise WorkspaceError(str(exc)) from exc
+        raise WorkspaceError(f"no result.toml in the workspace {folder}")
     try:
         with path.open("rb") as handle:
             return tomllib.load(handle)

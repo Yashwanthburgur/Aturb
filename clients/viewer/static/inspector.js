@@ -216,6 +216,13 @@
     renderEngineering();
     renderArtifacts();
     renderStatus();
+    renderAssembly();
+  }
+  /* The assembly panel is built by its own module, so it is only asked for
+   * when the manifest holds an assembly. */
+  function renderAssembly() {
+    var panel = global.AturbAssembly;
+    if (panel && typeof panel.render === "function") { panel.render(manifest); }
   }
   function objectOf(result) {
     return result.ok && result.body && typeof result.body === "object" ? result.body : {};

@@ -20,6 +20,7 @@ from urllib.parse import unquote, urlsplit
 
 from aturb.verify.engineering import analyze_step
 from aturb.verify.step import StepLoadError
+from clients.viewer.assembly_api import AssemblyWorkspaceError, assembly_payload
 from clients.viewer.edit_api import (
     EditHandler,
     RollbackHandler,
@@ -109,6 +110,19 @@ def engineering_facts(workspace: LoadedWorkspace) -> dict | None:
         return None
 
 
+def assembly_facts(workspace: LoadedWorkspace) -> dict | None:
+    """Return the assembly payload of the workspace, or None.
+
+    The payload is read from the result file of the assembly. A workspace that
+    is not an assembly workspace has no payload, and a result file that cannot
+    be read never stops the manifest.
+    """
+    try:
+        return assembly_payload(workspace.root)
+    except (AssemblyWorkspaceError, OSError, ValueError):
+        return None
+
+
 class ViewerHandler(BaseHTTPRequestHandler):
     """The request handler of the viewer server.
 
@@ -146,6 +160,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 payload = dict(self.viewer.workspace.manifest)
                 payload["engineering"] = engineering_facts(
                     self.viewer.workspace)
+                payload["assembly"] = assembly_facts(self.viewer.workspace)
                 self._send_json(200, payload)
             elif path == HISTORY_PATH:
                 self._send_json(200, read_history_payload(
