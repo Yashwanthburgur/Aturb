@@ -1,4 +1,4 @@
-"""Command line interface: aturb build, aturb check and aturb eval.
+"""Command line interface: aturb build, aturb check, aturb eval and aturb assemble.
 
 The build and check commands build a part through the active pack. ``build``
 reports the build; ``check`` then runs the neutral checks over the exported
@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aturb.agent.generate_cli import add_generate_parser, run_generate_command
+from aturb.assembly.cli import run_assemble_command
 from aturb.config import ConfigError, active_pack, load_config, timeout_s
 from aturb.contract.runner import Runner
 from aturb.contract.types import BuildRequest, BuildResult
@@ -39,14 +40,15 @@ def main(argv: list[str] | None = None) -> int:
     """Run one build or one check through the active pack."""
     parser = argparse.ArgumentParser(prog="aturb")
     sub = parser.add_subparsers(dest="command", required=True)
-    build = sub.add_parser("build")
-    build.add_argument("project_dir")
-    build.add_argument("part_id")
-    build.add_argument("--config", default=None)
-    check = sub.add_parser("check")
-    check.add_argument("project_dir")
-    check.add_argument("part_id")
-    check.add_argument("--config", default=None)
+    for name in ("build", "check"):
+        part = sub.add_parser(name)
+        part.add_argument("project_dir")
+        part.add_argument("part_id")
+        part.add_argument("--config", default=None)
+    assemble = sub.add_parser("assemble")
+    assemble.add_argument("project_dir")
+    assemble.add_argument("assembly_file")
+    assemble.add_argument("--config", default=None)
     evaluate = sub.add_parser("eval")
     evaluate.add_argument("tasks_dir")
     evaluate.add_argument("--config", default=None)
@@ -67,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
         name = active_pack(cfg)
         packs_root = default_packs_root()
         runner = load_runner(name, cfg, packs_root)
+        if args.command == "assemble":
+            return run_assemble_command(args, runner, timeout_s(cfg))
         if args.command == "eval":
             if args.agent:
                 return _run_agent_eval(args, cfg, name, packs_root, runner,
