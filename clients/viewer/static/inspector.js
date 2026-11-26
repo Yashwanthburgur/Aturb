@@ -27,6 +27,14 @@
     return fallback;
   }
   function fix(value) { return number(value, 0).toFixed(3); }
+  function millimetres(value) {
+    if (typeof value !== "number" || !isFinite(value)) { return "not measured"; }
+    return fix(value) + " mm";
+  }
+  function centre(value) {
+    if (!Array.isArray(value) || value.length !== 3) { return "not measured"; }
+    return value.map(fix).join(", ") + " mm";
+  }
   function clear(node) {
     if (!node) { return; }
     while (node.firstChild) { node.removeChild(node.firstChild); }
@@ -117,6 +125,61 @@
       item(holes, "diameter " + fix(hole.diameter) + " mm at (" + fix(hole.x) + ", " + fix(hole.y) + ") mm");
     });
   }
+  function renderEngineering() {
+    var panel = engineeringSection();
+    if (!panel) { return; }
+    var report = manifest.engineering;
+    var list = byId("engineering-facts");
+    clear(list);
+    if (!report || typeof report !== "object") {
+      fact(list, "Engineering", "not measured for this workspace");
+    } else {
+      fact(list, "Surface area", fix(report.surface_area) + " mm²");
+      fact(list, "Centre of mass", centre(report.center_of_mass));
+      fact(list, "Min hole spacing", millimetres(report.min_hole_spacing_mm));
+      fact(list, "Min edge margin", millimetres(report.min_edge_margin_mm));
+    }
+    var findings = byId("dfm-list");
+    clear(findings);
+    var advisories = report && Array.isArray(report.dfm_findings) ? report.dfm_findings : [];
+    if (!advisories.length) { item(findings, "None", "finding-none"); return; }
+    advisories.forEach(function (finding) {
+      var code = text(finding && finding.code, "DFM");
+      var severity = text(finding && finding.severity, "advisory");
+      item(findings, code + " (" + severity + "): " + text(finding && finding.message, ""));
+    });
+  }
+  /* The engineering panel is built here, so the page itself never changes. */
+  function engineeringSection() {
+    var panel = byId("engineering-panel");
+    if (panel) { return panel; }
+    var inspector = byId("inspector");
+    if (!inspector) { return null; }
+    panel = document.createElement("section");
+    panel.className = "panel-section";
+    panel.id = "engineering-panel";
+    var title = document.createElement("h2");
+    title.textContent = "Engineering & DFM";
+    panel.appendChild(title);
+    var facts = document.createElement("dl");
+    facts.className = "fact-list";
+    facts.id = "engineering-facts";
+    panel.appendChild(facts);
+    var subtitle = document.createElement("h3");
+    subtitle.textContent = "DFM advisories";
+    panel.appendChild(subtitle);
+    var findings = document.createElement("ul");
+    findings.className = "finding-list";
+    findings.id = "dfm-list";
+    panel.appendChild(findings);
+    var artifacts = byId("artifacts-panel");
+    if (artifacts && artifacts.parentNode) {
+      artifacts.parentNode.insertBefore(panel, artifacts);
+    } else {
+      inspector.appendChild(panel);
+    }
+    return panel;
+  }
   function renderArtifacts() {
     var list = byId("artifact-list");
     clear(list);
@@ -150,6 +213,7 @@
     renderUsage();
     renderBuild();
     renderGeometry();
+    renderEngineering();
     renderArtifacts();
     renderStatus();
   }
