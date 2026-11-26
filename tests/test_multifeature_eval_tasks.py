@@ -81,15 +81,6 @@ EXPECTED_HOLE_COUNTS = {
     "stepped_shaft": 0,
 }
 
-# The expectation schema holds one expected diameter for every hole, so the
-# 14 mm bore and the 24 mm counterbore of the flanged hub cannot be named
-# separately. The two checks that would compare those diameters against the
-# single expected value are the only checks that cannot pass, and the answer
-# file does not require them. Every other check of every task must pass.
-UNREPRESENTABLE_CHECKS = {
-    "flanged_hub_counterbore": frozenset({"hole_2_diameter", "hole_3_diameter"}),
-}
-
 BRAND_PATTERN = re.compile(
     r"\b(freecad|fcstd|partdesign|sketcher|solidworks|onshape|fusion|"
     r"featurescript|catia|inventor|solid\s+edge|siemens\s+nx|creo|rhino|"
@@ -169,6 +160,10 @@ def test_the_expected_values_are_usable(task_id):
     assert all(size > 0.0 for size in expected["bbox"])
     assert expected["hole_count"] >= 0
     assert len(expected["hole_positions"]) == expected["hole_count"]
+    if "hole_diameters" in expected:
+        diameters = expected["hole_diameters"]
+        assert len(diameters) == expected["hole_count"]
+        assert all(diameter > 0.0 for diameter in diameters)
 
 
 @pytest.mark.parametrize("task_id", TASK_IDS)
@@ -225,4 +220,4 @@ def test_the_golden_part_passes_every_required_check(tmp_path, task_id):
         assert name in by_name, f"{task_id}: the check {name} was not produced"
         assert by_name[name].passed, f"{task_id}: the check {name} did not pass"
     failed = {check.name for check in checks if not check.passed}
-    assert failed == UNREPRESENTABLE_CHECKS.get(task_id, frozenset())
+    assert failed == frozenset()

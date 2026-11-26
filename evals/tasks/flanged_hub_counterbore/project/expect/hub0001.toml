@@ -1,4 +1,5 @@
-# Expected measurements for the flanged hub hub0001. Exactly five keys.
+# Expected measurements for the flanged hub hub0001. Six keys: the five
+# required ones and the optional per-hole diameters.
 # Hand volume: pi x 40^2 x 10 + pi x 20^2 x 20 - pi x 12^2 x 8
 # - pi x 7^2 x 22 - 4 x pi x 3^2 x 10 = 21410 pi
 # = 67261.49871335747 mm^3.
@@ -13,12 +14,14 @@
 #   3: the 24 mm counterbore at x = 0 and y = 0
 #   4: the 6 mm bolt hole at x = 0 and y = 30
 #   5: the 6 mm bolt hole at x = 30 and y = 0
-# The schema holds one expected diameter for every hole, so hole_diameter
-# names the 6 mm bolt holes. The bore and the counterbore are named by their
-# positions only.
+# The optional hole_diameters names the diameter of every hole, in the order of
+# hole_positions, so the bore and the counterbore are named by their own
+# diameters and not only by their positions. The scalar hole_diameter still
+# names the 6 mm bolt holes.
 
 volume = 67261.49871335747
 bbox = [80.0, 80.0, 30.0]
 hole_count = 6
 hole_diameter = 6.0
 hole_positions = [[-30.0, 0.0], [0.0, -30.0], [0.0, 0.0], [0.0, 0.0], [0.0, 30.0], [30.0, 0.0]]
+hole_diameters = [6.0, 6.0, 14.0, 24.0, 6.0, 6.0]
