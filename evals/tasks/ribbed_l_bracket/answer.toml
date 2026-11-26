@@ -1,0 +1,7 @@
+# The correct answer for ribbed_l_bracket. Exactly five keys.
+
+task_id = "ribbed_l_bracket"
+part_id = "brk0002"
+expect_file = "expect/brk0002.toml"
+required_checks = ["volume", "bbox_x", "bbox_y", "bbox_z", "hole_count", "hole_0_diameter", "hole_0_x", "hole_0_y", "hole_1_diameter", "hole_1_x", "hole_1_y"]
+max_score = 1.0

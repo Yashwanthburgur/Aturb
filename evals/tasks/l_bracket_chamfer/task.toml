@@ -1,0 +1,6 @@
+# Task metadata for the multi-feature chamfered L-bracket task.
+
+task_id = "l_bracket_chamfer"
+part_id = "brk0001"
+name = "L-bracket with an orthogonal wall, two mounting holes and a chamfer"
+description = "Build an L-bracket with an 80 x 50 x 8 mm base flange spanning X = 0 to 80 and Y = -25 to 25, an 8 mm thick wall 40 mm high standing on the flange at X = 0 to 8, two 6 mm diameter through-holes at x = 25 and x = 65 on y = 0, and a 2 mm chamfer on the outer vertical edge of the wall at x = 8 and y = 25."

@@ -1,0 +1,6 @@
+# Task metadata for the multi-feature flanged hub task.
+
+task_id = "flanged_hub_counterbore"
+part_id = "hub0001"
+name = "Flanged hub with a bolt circle and a stepped central bore"
+description = "Build a flanged hub centred on the origin in X and Y: an 80 mm diameter flange 10 mm thick from Z = 0 to Z = 10, a 40 mm diameter hub 20 mm high from Z = 10 to Z = 30, four 6 mm diameter through-holes on a 30 mm radius bolt circle at x = 30, x = -30, y = 30 and y = -30, a 14 mm diameter through-bore on the axis, and a 24 mm diameter counterbore 8 mm deep from the top face at Z = 30."

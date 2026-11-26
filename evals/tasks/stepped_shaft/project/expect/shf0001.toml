@@ -1,0 +1,12 @@
+# Expected measurements for the stepped shaft shf0001. Exactly five keys.
+# Hand volume: pi x 15^2 x 20 + pi x 8^2 x 30 = 6420 pi
+# = 20169.02483604647 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 20169.02483604647 mm^3, bbox 30 x 30 x 50 mm, one valid solid,
+# no hole.
+
+volume = 20169.02483604647
+bbox = [30.0, 30.0, 50.0]
+hole_count = 0
+hole_diameter = 0.0
+hole_positions = []

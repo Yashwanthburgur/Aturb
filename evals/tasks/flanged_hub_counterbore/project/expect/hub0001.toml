@@ -1,0 +1,24 @@
+# Expected measurements for the flanged hub hub0001. Exactly five keys.
+# Hand volume: pi x 40^2 x 10 + pi x 20^2 x 20 - pi x 12^2 x 8
+# - pi x 7^2 x 22 - 4 x pi x 3^2 x 10 = 21410 pi
+# = 67261.49871335747 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 67261.49871335746 mm^3, bbox 80 x 80 x 30 mm, one valid solid,
+# six holes: four of 6 mm on the bolt circle, the 14 mm bore and the 24 mm
+# counterbore, both on the axis.
+# Six holes, reported in the order of x and then y:
+#   0: the 6 mm bolt hole at x = -30 and y = 0
+#   1: the 6 mm bolt hole at x = 0 and y = -30
+#   2: the 14 mm through-bore at x = 0 and y = 0
+#   3: the 24 mm counterbore at x = 0 and y = 0
+#   4: the 6 mm bolt hole at x = 0 and y = 30
+#   5: the 6 mm bolt hole at x = 30 and y = 0
+# The schema holds one expected diameter for every hole, so hole_diameter
+# names the 6 mm bolt holes. The bore and the counterbore are named by their
+# positions only.
+
+volume = 67261.49871335747
+bbox = [80.0, 80.0, 30.0]
+hole_count = 6
+hole_diameter = 6.0
+hole_positions = [[-30.0, 0.0], [0.0, -30.0], [0.0, 0.0], [0.0, 0.0], [0.0, 30.0], [30.0, 0.0]]

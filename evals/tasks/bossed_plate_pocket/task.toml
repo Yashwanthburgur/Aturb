@@ -1,0 +1,6 @@
+# Task metadata for the multi-feature bossed plate task.
+
+task_id = "bossed_plate_pocket"
+part_id = "plt0005"
+name = "Bossed plate with a blind pocket and a concentric through-hole"
+description = "Build a 100 x 60 x 8 mm plate centred on the origin in X and Y, with a 24 mm diameter boss 12 mm high on the centre, a 20 x 20 mm blind pocket 4 mm deep centred at x = 32 mm and y = 0, and a 10 mm diameter through-hole on the boss axis at x = 0 and y = 0."

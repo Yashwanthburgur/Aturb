@@ -1,0 +1,12 @@
+# Expected measurements for the bossed plate plt0005. Exactly five keys.
+# Hand volume: 100 x 60 x 8 + pi x 12^2 x 12 - pi x 5^2 x 20 - 20 x 20 x 4
+# = 46400 + 1228 pi = 50257.875778608266 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 50257.87577860827 mm^3, bbox 100 x 60 x 20 mm, one valid solid,
+# one through-hole of 10 mm at x = 0 and y = 0.
+
+volume = 50257.875778608266
+bbox = [100.0, 60.0, 20.0]
+hole_count = 1
+hole_diameter = 10.0
+hole_positions = [[0.0, 0.0]]

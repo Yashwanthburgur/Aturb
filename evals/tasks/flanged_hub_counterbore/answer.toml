@@ -1,0 +1,14 @@
+# The correct answer for flanged_hub_counterbore. Exactly five keys.
+#
+# The expectation schema holds one expected diameter for every hole, so it
+# cannot name the 14 mm bore and the 24 mm counterbore separately. The two
+# checks that would compare those two diameters against the single expected
+# value, hole_2_diameter and hole_3_diameter, are therefore not required.
+# Every other check is required, including the position of both coaxial
+# holes at x = 0 and y = 0.
+
+task_id = "flanged_hub_counterbore"
+part_id = "hub0001"
+expect_file = "expect/hub0001.toml"
+required_checks = ["volume", "bbox_x", "bbox_y", "bbox_z", "hole_count", "hole_0_diameter", "hole_0_x", "hole_0_y", "hole_1_diameter", "hole_1_x", "hole_1_y", "hole_2_x", "hole_2_y", "hole_3_x", "hole_3_y", "hole_4_diameter", "hole_4_x", "hole_4_y", "hole_5_diameter", "hole_5_x", "hole_5_y"]
+max_score = 1.0

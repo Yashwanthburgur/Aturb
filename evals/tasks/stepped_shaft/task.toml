@@ -1,0 +1,6 @@
+# Task metadata for the multi-feature stepped shaft task.
+
+task_id = "stepped_shaft"
+part_id = "shf0001"
+name = "Stepped revolved shaft with two diameters"
+description = "Build a stepped shaft on the global Z axis: a 30 mm diameter section 20 mm long from Z = 0 to Z = 20, and a 16 mm diameter section 30 mm long from Z = 20 to Z = 50, revolved as one solid of revolution about the Z axis."

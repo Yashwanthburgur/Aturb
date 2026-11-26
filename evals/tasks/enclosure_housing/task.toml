@@ -1,0 +1,6 @@
+# Task metadata for the multi-feature hollow enclosure task.
+
+task_id = "enclosure_housing"
+part_id = "enc0001"
+name = "Hollow enclosure with rounded outer corners, a blind cavity and floor holes"
+description = "Build a hollow enclosure centred on the origin in X and Y: an outer box 100 x 70 x 30 mm from Z = 0 to Z = 30 with its four outer vertical corners rounded to a 6 mm radius, an interior cavity 84 x 54 mm and 24 mm deep opening at the top face Z = 30 and leaving a 6 mm floor, and four 5 mm diameter through-holes in the floor at x = -32 and x = 32 with y = -18 and y = 18."

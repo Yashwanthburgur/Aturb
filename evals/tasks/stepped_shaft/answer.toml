@@ -1,0 +1,7 @@
+# The correct answer for stepped_shaft. Exactly five keys.
+
+task_id = "stepped_shaft"
+part_id = "shf0001"
+expect_file = "expect/shf0001.toml"
+required_checks = ["volume", "bbox_x", "bbox_y", "bbox_z", "hole_count"]
+max_score = 1.0

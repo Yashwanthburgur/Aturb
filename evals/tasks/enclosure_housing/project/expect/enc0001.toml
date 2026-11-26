@@ -1,0 +1,14 @@
+# Expected measurements for the hollow enclosure enc0001. Exactly five keys.
+# Hand volume: 100 x 70 x 30 - 4 x (6^2 - pi x 6^2 / 4) x 30
+# - 84 x 54 x 24 - 4 x pi x 2.5^2 x 6
+# = 210000 - 4 x (36 - 9 pi) x 30 - 108864 - 150 pi
+# = 99737.68116783851 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 99737.6811678386 mm^3, bbox 100 x 70 x 30 mm, one valid solid,
+# four through-holes of 5 mm at x = -32 and x = 32, with y = -18 and y = 18.
+
+volume = 99737.68116783851
+bbox = [100.0, 70.0, 30.0]
+hole_count = 4
+hole_diameter = 5.0
+hole_positions = [[-32.0, -18.0], [-32.0, 18.0], [32.0, -18.0], [32.0, 18.0]]

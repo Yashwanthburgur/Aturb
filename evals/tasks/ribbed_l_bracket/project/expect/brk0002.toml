@@ -1,0 +1,12 @@
+# Expected measurements for the ribbed L-bracket brk0002. Exactly five keys.
+# Hand volume: 80 x 50 x 8 + 8 x 50 x 40 + 30 x 30 / 2 x 8
+# - 2 x pi x 3^2 x 8 = 51600 - 144 pi = 51147.61065788307 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 51147.610657883066 mm^3, bbox 80 x 50 x 48 mm, one valid solid,
+# two through-holes of 6 mm at x = 60 with y = -15 and y = 15.
+
+volume = 51147.61065788307
+bbox = [80.0, 50.0, 48.0]
+hole_count = 2
+hole_diameter = 6.0
+hole_positions = [[60.0, -15.0], [60.0, 15.0]]

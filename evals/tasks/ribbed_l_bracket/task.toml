@@ -1,0 +1,6 @@
+# Task metadata for the multi-feature ribbed L-bracket task.
+
+task_id = "ribbed_l_bracket"
+part_id = "brk0002"
+name = "Ribbed L-bracket with a triangular gusset rib and two mounting holes"
+description = "Build an L-bracket with an 80 x 50 x 8 mm base flange spanning X = 0 to 80 and Y = -25 to 25, an 8 mm thick wall 40 mm high standing on the flange at X = 0 to 8, a triangular gusset rib 8 mm thick in the plane Y = 0 with corners at x = 8 and z = 8, x = 38 and z = 8, and x = 8 and z = 38, and two 6 mm diameter through-holes at x = 60 with y = -15 and y = 15."

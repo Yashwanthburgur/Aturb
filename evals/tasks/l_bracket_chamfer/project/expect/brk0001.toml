@@ -1,0 +1,12 @@
+# Expected measurements for the chamfered L-bracket brk0001. Exactly five keys.
+# Hand volume: 80 x 50 x 8 + 8 x 50 x 40 - 2 x pi x 3^2 x 8 - 2 x 40
+# = 48000 - 144 pi - 80 = 47467.61065788307 mm^3.
+# Measured in real FreeCAD 1.0.1 and read back from STEP with build123d:
+# volume 47467.61065788308 mm^3, bbox 80 x 50 x 48 mm, one valid solid,
+# two through-holes of 6 mm at x = 25 and x = 65, both on y = 0.
+
+volume = 47467.61065788307
+bbox = [80.0, 50.0, 48.0]
+hole_count = 2
+hole_diameter = 6.0
+hole_positions = [[25.0, 0.0], [65.0, 0.0]]
