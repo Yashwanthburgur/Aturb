@@ -7,6 +7,8 @@ The STEP inspection rows were added on 2026-11-19 by the Phase 3 spike
 `tools/spikes/b3d_inspect.py`; run that script to reproduce them.
 The hole-detection rows were verified in-session on 2026-11-19 against the same
 fixture; they are the calls that `aturb/verify/holes.py` uses.
+The engineering-measurement rows were verified in-session on 2026-11-26 against
+the same fixture; they are the calls that `aturb/verify/engineering.py` uses.
 
 | Call                                             | Purpose                                    | Verified output                                                                                      |
 | ------------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
@@ -56,6 +58,12 @@ fixture; they are the calls that `aturb/verify/holes.py` uses.
 | `a - b` (two vectors)                            | Offset between two points                  | `Vector: (X=5, Y=0, Z=5)` for the start point of the hole face at X = -40 minus its axis position    |
 | `vector.dot(other)`                              | Dot product of two vectors                 | `5.0` for that offset against the axis direction `(0, 0, 1)`                                         |
 | `vector.length`                                  | Length of a vector                         | `7.0710678118654755` for that offset                                                                 |
+| `shape.bounding_box().min` and `.max`            | The two corners of the bounding box        | Plate fixture: `min` = `Vector: (X=-60, Y=-30, Z=-2.5)`, `max` = `Vector: (X=60, Y=30, Z=2.5)`       |
+| `solid.center(CenterOf.MASS)`                    | Mass centroid of a solid                   | Asymmetric L: `Vector: (X=-0.714286, Y=-0.357143, Z=-0.357143)`                                      |
+| `solid.center()`                                 | Default centre of a solid (MASS)           | Same as `CenterOf.MASS`: `Vector: (X=-0.714286, Y=-0.357143, Z=-0.357143)`                           |
+| `solid.center(CenterOf.BOUNDING_BOX)`            | Middle of the bounding box of a solid      | Asymmetric L: `Vector: (X=0, Y=0, Z=0)` — not the mass centre                                        |
+| `solid.center(CenterOf.GEOMETRY)`                | Geometric centre of a solid                | Raises `ValueError: Center of GEOMETRY is not supported for this object`                             |
+| `compound.center(CenterOf.MASS)`                 | Mass centroid of several solids            | Three 10 mm boxes: `Vector: (X=-3.33333, Y=3.33333, Z=0)`                                            |
 
 ## Notes from verification
 
@@ -98,3 +106,13 @@ fixture; they are the calls that `aturb/verify/holes.py` uses.
   to be found by trying the edges of the face.
 - `Vector.length` and `Vector.dot` measure an offset vector, and `a - b` gives the offset
   between two points.
+- `center` on a solid or a compound defaults to `CenterOf.MASS`, unlike `face.center()` and
+  `edge.center()`, which default to `CenterOf.GEOMETRY`. The signature is
+  `center(self, center_of: CenterOf = CenterOf.MASS) -> Vector`.
+- `CenterOf.GEOMETRY` raises `ValueError: Center of GEOMETRY is not supported for this object`
+  on a solid, so a solid centre must always ask for `MASS` or `BOUNDING_BOX`.
+- `center` lives on the 3D mixin and not on the base `Shape` class: `hasattr(build123d.Shape,
+"center")` is `False`, while `Solid` and `Compound` have it. Read the centroid from
+  `shape.solids()` when the static type of the shape is `Shape`.
+- `bounding_box().min` and `bounding_box().max` are `Vector` objects, like
+  `bounding_box().size`.
