@@ -27,6 +27,7 @@ from aturb.agent.revisions import (
 from aturb.agent.types import ModelRequest, ModelResponse
 from aturb.config import load_config, timeout_s
 from aturb.packs import default_packs_root, load_manifest, load_runner
+from aturb.verify.engineering import EngineeringReport
 from aturb.verify.step import load_step
 from aturb.workspace.paths import PathEscapeError
 from clients.viewer.workspace import load_workspace
@@ -161,6 +162,92 @@ def test_the_edit_requirement_holds_four_labelled_blocks():
     assert "SOURCE" in requirement
     assert "Editing rules:" in requirement
     assert "ONLY the requested change" in requirement
+
+
+def test_the_holes_are_rendered_as_readable_facts():
+    """The holes of the manifest are readable facts, not raw dictionaries."""
+    manifest = {"volume": 36000.0, "bbox_size": [120.0, 60.0, 5.0],
+                "hole_count": 2,
+                "holes": [{"diameter": 10.0, "x": -40.0, "y": 0.0},
+                          {"diameter": 10.0, "x": 40.0, "y": 0.0}]}
+
+    requirement = compose_edit_requirement(INSTRUCTION, "SOURCE", manifest)
+
+    assert "- hole 1: diameter 10.0 mm, position (-40.0, 0.0) mm" in requirement
+    assert "- hole 2: diameter 10.0 mm, position (40.0, 0.0) mm" in requirement
+    assert "{'diameter'" not in requirement
+
+
+def test_the_requirement_carries_the_current_parameters():
+    """The parameters of the source come between the facts and the source."""
+    source = ("# --- PARAMS ---\nLENGTH_MM = 120.0\nWIDTH_MM = 60.0\n"
+              "# --- END PARAMS ---\n")
+
+    requirement = compose_edit_requirement(INSTRUCTION, source, {})
+
+    assert "Current parameters:" in requirement
+    assert "- LENGTH_MM = 120.0" in requirement
+    assert requirement.index("Current parameters:") < requirement.index(
+        "Current verified source code:")
+
+
+def test_a_source_without_parameters_has_no_parameter_block():
+    """A source without a parameter block shows no parameter."""
+    requirement = compose_edit_requirement(INSTRUCTION, "SOURCE", {})
+
+    assert "Current parameters:" not in requirement
+
+
+def test_the_requirement_carries_the_engineering_measurements():
+    """The engineering report of the exported STEP is part of the requirement."""
+    report = EngineeringReport(
+        bbox_min=(-60.0, -30.0, -2.5), bbox_max=(60.0, 30.0, 2.5),
+        bbox_size=(120.0, 60.0, 5.0), volume=35214.602,
+        surface_area=16200.0, center_of_mass=(0.0, 0.0, 0.0), hole_count=2,
+        min_hole_spacing_mm=70.0, min_edge_margin_mm=15.0, dfm_findings=())
+
+    requirement = compose_edit_requirement(
+        INSTRUCTION, "SOURCE", {}, engineering=report)
+
+    assert "Current engineering measurements (from STEP):" in requirement
+    assert "surface_area: 16200.0 mm^2" in requirement
+    assert "min_hole_spacing: 70.0 mm" in requirement
+    assert "min_edge_margin: 15.0 mm" in requirement
+
+
+def test_a_requirement_without_engineering_has_no_engineering_block():
+    """A caller without a report gets the requirement of the earlier shape."""
+    requirement = compose_edit_requirement(INSTRUCTION, "SOURCE", {})
+
+    assert "Current engineering measurements" not in requirement
+
+
+def test_the_editing_rules_ask_for_coupled_changes_and_clearances():
+    """The rules ask for the coupled changes and forbid a DFM violation."""
+    requirement = compose_edit_requirement(INSTRUCTION, "SOURCE", {})
+
+    assert "Propagate a coupled dimensional change" in requirement
+    assert "DFM1" in requirement
+    assert "DFM2" in requirement
+    assert "DFM3" in requirement
+    assert "Preserve every unaffected feature" in requirement
+    assert "Return the complete updated source file." not in requirement
+
+
+def test_an_edit_measures_the_engineering_of_the_active_revision(tmp_path):
+    """The prompt of an edit holds the measurements of the exported STEP."""
+    workspace = _workspace(tmp_path)
+    ensure_history(workspace)
+    client = _FakeClient(GOOD)
+
+    result = _edit(workspace, client)
+
+    assert result.promoted is True
+    prompt = client.requests[0].prompt
+    assert "Current engineering measurements (from STEP):" in prompt
+    assert "min_hole_spacing: 70.0 mm" in prompt
+    assert "min_edge_margin: 15.0 mm" in prompt
+    assert "- hole 1: diameter 10.0 mm, position (-40.0, 0.0) mm" in prompt
 
 
 def test_a_successful_edit_promotes_a_new_revision(tmp_path):
