@@ -3,6 +3,10 @@
 The client is tested with fake transports, so no test touches the network. The
 tests check the request body the API notes record, the response the client
 reads out of the answer, and the errors it raises when the call does not work.
+
+The last tests check the production factories that build the client, so the
+optional reasoning effort of the configuration is proved to reach the body of
+the request.
 """
 
 from __future__ import annotations
@@ -15,8 +19,14 @@ from typing import Any
 
 import pytest
 
+from aturb.agent.config import agent_settings
 from aturb.agent.model import HttpModelClient, http_transport
 from aturb.agent.types import AgentError, ModelRequest
+from aturb.cli import _model_client
+from clients.viewer.edit_api import _default_client_factory as _edit_client_factory
+from clients.viewer.generate_api import (
+    _default_client_factory as _generate_client_factory,
+)
 
 API_KEY = "test-key-must-not-be-logged"
 BASE_URL = "https://example.invalid/v1"
@@ -176,6 +186,60 @@ def test_the_client_from_settings_without_a_reasoning_effort_sends_none():
 
     _, body, _, _ = transport.calls[0]
     assert "reasoning_effort" not in body
+
+
+def _settings(**overrides) -> dict:
+    """Return the agent settings of a configuration."""
+    section = {
+        "provider": "openai_compatible",
+        "model": MODEL,
+        "base_url": BASE_URL,
+        "api_key_env": "ATURB_AGENT_API_KEY",
+        "timeout_s": 5.0,
+    }
+    section.update(overrides)
+    return agent_settings({"agent": section})
+
+
+@pytest.mark.parametrize("effort", ["low", ""])
+def test_every_production_factory_carries_the_reasoning_effort(monkeypatch, effort):
+    """Every production factory carries the reasoning effort of the settings."""
+    monkeypatch.setenv("ATURB_AGENT_API_KEY", API_KEY)
+    settings = _settings(reasoning_effort=effort)
+
+    clients = [
+        _model_client(settings),
+        _generate_client_factory(settings, API_KEY),
+        _edit_client_factory(settings, API_KEY),
+    ]
+
+    for client in clients:
+        assert isinstance(client, HttpModelClient)
+        assert client.reasoning_effort == effort
+
+
+@pytest.mark.parametrize("effort, expected", [("low", "low"), ("", None)])
+def test_the_reasoning_effort_reaches_the_request_body(monkeypatch, effort, expected):
+    """The effort of the configuration reaches the body of the request.
+
+    The client is built by the production factory of the command line, so the
+    whole chain is exercised: the configuration, the settings, the factory and
+    the body that goes out.
+    """
+    monkeypatch.setenv("ATURB_AGENT_API_KEY", API_KEY)
+    transport = _FakeTransport(_answer())
+    monkeypatch.setattr("aturb.agent.model.http_transport", transport)
+    settings = _settings(reasoning_effort=effort)
+
+    client = _model_client(settings)
+    client.complete(_request())
+
+    _, body, _, _ = transport.calls[0]
+    if expected is None:
+        assert "reasoning_effort" not in body
+        assert set(body) == {"model", "messages", "max_tokens", "stream"}
+    else:
+        assert body["reasoning_effort"] == expected
 
 
 def test_the_token_cap_of_the_request_is_the_one_the_body_carries():
