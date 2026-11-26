@@ -1,4 +1,4 @@
- """Complex mechanical parts, built in the real CAD and measured neutrally.
+"""Complex mechanical parts, built in the real CAD and measured neutrally.
 
 Every part is built by the production FreeCADRunner, so the static safety check
 runs first, and every number is measured from the exported STEP.
