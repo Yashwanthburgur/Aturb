@@ -11,6 +11,7 @@ import pytest
 
 from aturb.agent.config import agent_settings, read_api_key
 from aturb.agent.types import AgentError
+from aturb.config import ConfigError
 
 DEFAULTS = {
     "provider": "openai_compatible",
@@ -27,6 +28,7 @@ DEFAULTS = {
     "input_price_per_mtok": 0.0,
     "output_price_per_mtok": 0.0,
     "timeout_s": 120,
+    "reasoning_effort": "",
 }
 
 OVERRIDES = {
@@ -44,6 +46,7 @@ OVERRIDES = {
     "input_price_per_mtok": 0.15,
     "output_price_per_mtok": 0.60,
     "timeout_s": 45,
+    "reasoning_effort": "high",
 }
 
 KEY = "secret-key-must-not-be-logged"
@@ -166,3 +169,44 @@ def test_loop_limits_have_a_positive_attempt_bound_and_nonnegative_caps():
                        ("max_total_output_tokens", -1)):
         with pytest.raises(AgentError):
             agent_settings({"agent": {key: value}})
+
+
+def test_the_reasoning_effort_is_optional():
+    """A configuration that names no reasoning effort leaves it unset."""
+    settings = agent_settings({})
+
+    assert settings["reasoning_effort"] == ""
+
+
+def test_the_reasoning_effort_is_taken_from_the_configuration():
+    """A named reasoning effort is kept as it is."""
+    settings = agent_settings({"agent": {"reasoning_effort": "low"}})
+
+    assert settings["reasoning_effort"] == "low"
+
+
+def test_the_reasoning_effort_is_stored_stripped():
+    """A reasoning effort with spaces around it is stored without them."""
+    settings = agent_settings({"agent": {"reasoning_effort": "  high  "}})
+
+    assert settings["reasoning_effort"] == "high"
+
+
+@pytest.mark.parametrize("value", [1, True, 1.5, ["low"], {"effort": "low"}])
+def test_a_reasoning_effort_that_is_not_text_raises(value):
+    """A reasoning effort that is not text is refused."""
+    with pytest.raises(ConfigError):
+        agent_settings({"agent": {"reasoning_effort": value}})
+
+
+@pytest.mark.parametrize("value", [" ", "low high", "low\thigh", "\n"])
+def test_a_reasoning_effort_that_holds_whitespace_raises(value):
+    """A reasoning effort that holds whitespace is refused."""
+    with pytest.raises(ConfigError):
+        agent_settings({"agent": {"reasoning_effort": value}})
+
+
+def test_a_bad_reasoning_effort_is_also_an_agent_error():
+    """A refused reasoning effort is an agent error, as every other setting is."""
+    with pytest.raises(AgentError):
+        agent_settings({"agent": {"reasoning_effort": 3}})

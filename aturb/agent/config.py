@@ -7,6 +7,10 @@ file and never enters the repository.
 
 The provider, the model and the endpoint are configuration, not code. Nothing
 here knows a particular provider.
+
+The reasoning effort is optional. It is one word, such as ``low``, ``medium``,
+``high`` or ``none``, and an empty string means the request carries no
+reasoning effort at all.
 """
 
 from __future__ import annotations
@@ -15,6 +19,16 @@ import os
 from collections.abc import Mapping
 
 from aturb.agent.types import AgentError
+from aturb.config import ConfigError
+
+
+class AgentConfigError(AgentError, ConfigError):
+    """Raised when an agent setting cannot be used.
+
+    It is an ``AgentError`` and a ``ConfigError`` at once, so every path that
+    catches one of them catches this one too.
+    """
+
 
 DEFAULTS: dict[str, object] = {
     "provider": "openai_compatible",  # starting default
@@ -31,6 +45,7 @@ DEFAULTS: dict[str, object] = {
     "input_price_per_mtok": 0.0,  # starting default
     "output_price_per_mtok": 0.0,  # starting default
     "timeout_s": 120,  # starting default
+    "reasoning_effort": "",  # starting default
 }
 
 LOOP_LIMITS = (
@@ -55,6 +70,8 @@ def agent_settings(cfg: dict) -> dict:
         if key in section:
             settings[key] = section[key]
     _validate_loop_limits(settings)
+    settings["reasoning_effort"] = _reasoning_effort(
+        settings["reasoning_effort"])
     return settings
 
 
@@ -68,6 +85,28 @@ def _validate_loop_limits(settings: dict) -> None:
         if value < minimum:
             raise AgentError(
                 f"the agent setting {key!r} must be at least {minimum}")
+
+
+def _reasoning_effort(value: object) -> str:
+    """Return the reasoning effort of the settings, or refuse the value.
+
+    The effort is optional, so an empty string means the request carries no
+    reasoning effort at all. The value is stored stripped, so the effort is
+    one word. A value that is not text, or that holds whitespace, is refused.
+    """
+    if not isinstance(value, str):
+        raise AgentConfigError(
+            "the agent setting 'reasoning_effort' must be a string")
+    stripped = value.strip()
+    if not stripped:
+        if value:
+            raise AgentConfigError(
+                "the agent setting 'reasoning_effort' must not hold whitespace")
+        return ""
+    if any(character.isspace() for character in stripped):
+        raise AgentConfigError(
+            "the agent setting 'reasoning_effort' must not hold whitespace")
+    return stripped
 
 
 def read_api_key(settings: dict, env: Mapping[str, str] | None = None) -> str:

@@ -23,3 +23,7 @@ max_cost_usd = 0.50                     # starting default
 input_price_per_mtok = 0.0              # starting default
 output_price_per_mtok = 0.0             # starting default
 timeout_s = 120                         # starting default
+# Optional. The reasoning effort of the model, as one word: "low", "medium",
+# "high" or "none". Leave it empty and the request carries no reasoning
+# effort at all, which is exactly the request that was sent before.
+reasoning_effort = ""                   # starting default

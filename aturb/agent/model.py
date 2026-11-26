@@ -6,6 +6,10 @@ Chat Completions request, and a response that carries the generated text and
 the two token counts. It reads only the fields that note records, it never
 retries, and it never puts the API key in an error message.
 
+The reasoning effort is the one optional field of the request body. It is sent
+only when the configuration names one, so a request without one is exactly the
+request that was sent before.
+
 The transport is a parameter, so the tests never touch the network. The default
 transport is the one that talks to the provider over `urllib.request`.
 """
@@ -57,6 +61,7 @@ class HttpModelClient:
         *,
         endpoint: str = CHAT_COMPLETIONS_PATH,  # starting default
         provider: str = "",  # starting default
+        reasoning_effort: str = "",  # starting default
     ) -> None:
         """Take the configuration of the call and the transport that makes it."""
         self.base_url = base_url
@@ -66,6 +71,33 @@ class HttpModelClient:
         self.transport: Transport = transport if transport is not None else http_transport
         self.endpoint = endpoint
         self.provider = provider
+        self.reasoning_effort = reasoning_effort
+
+    @classmethod
+    def from_settings(
+        cls,
+        settings: dict,
+        api_key: str,
+        *,
+        transport: Transport | None = None,
+        timeout: float | None = None,
+    ) -> "HttpModelClient":
+        """Build a client from the agent settings of a configuration.
+
+        The settings name the base URL, the model, the timeout, the provider
+        and the optional reasoning effort. The API key is never read from the
+        settings: it comes from the environment variable they name.
+        """
+        return cls(
+            base_url=str(settings["base_url"]),
+            model=str(settings["model"]),
+            api_key=api_key,
+            timeout=float(settings["timeout_s"]
+                          ) if timeout is None else timeout,
+            transport=transport,
+            provider=str(settings["provider"]),
+            reasoning_effort=str(settings.get("reasoning_effort", "")),
+        )
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         """Send one request to the model and return its response."""
@@ -101,13 +133,21 @@ class HttpModelClient:
         return self._parse_response(text)
 
     def _request_body(self, request: ModelRequest) -> dict[str, Any]:
-        """Build the request body recorded in the API notes."""
-        return {
+        """Build the request body recorded in the API notes.
+
+        The reasoning effort is optional: it is sent only when the
+        configuration names one, so a request without one carries exactly the
+        fields it carried before.
+        """
+        body: dict[str, Any] = {
             "model": request.model or self.model,
             "messages": [{"role": "user", "content": request.prompt}],
             "max_tokens": request.max_output_tokens,
             "stream": False,
         }
+        if self.reasoning_effort:
+            body["reasoning_effort"] = self.reasoning_effort
+        return body
 
     def _parse_response(self, text: str) -> ModelResponse:
         """Read the generated text and the token counts out of the response."""

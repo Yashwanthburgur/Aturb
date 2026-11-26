@@ -117,6 +117,78 @@ def test_the_request_body_holds_the_recorded_fields():
     assert body["stream"] is False
 
 
+def test_the_request_body_omits_the_reasoning_effort_when_it_is_unset():
+    """A client without a reasoning effort sends no reasoning effort."""
+    transport = _FakeTransport(_answer())
+    client = _client(transport)
+
+    client.complete(_request())
+
+    _, body, _, _ = transport.calls[0]
+    assert "reasoning_effort" not in body
+
+
+def test_the_request_body_holds_the_reasoning_effort_when_it_is_set():
+    """A named reasoning effort is sent in the body, and nothing else changes."""
+    transport = _FakeTransport(_answer())
+    client = _client(transport, reasoning_effort="low")
+
+    client.complete(_request())
+
+    _, body, _, _ = transport.calls[0]
+    assert body["reasoning_effort"] == "low"
+    assert set(body) == {"model", "messages", "max_tokens", "stream",
+                         "reasoning_effort"}
+
+
+def test_the_client_from_settings_takes_the_reasoning_effort():
+    """A client built from the settings carries the named reasoning effort."""
+    transport = _FakeTransport(_answer())
+    settings = {
+        "base_url": BASE_URL,
+        "model": MODEL,
+        "timeout_s": 5.0,
+        "provider": "openai_compatible",
+        "reasoning_effort": "medium",
+    }
+    client = HttpModelClient.from_settings(
+        settings, API_KEY, transport=transport)
+
+    client.complete(_request())
+
+    _, body, _, _ = transport.calls[0]
+    assert body["reasoning_effort"] == "medium"
+
+
+def test_the_client_from_settings_without_a_reasoning_effort_sends_none():
+    """A client built from settings that name no effort sends no effort."""
+    transport = _FakeTransport(_answer())
+    settings = {
+        "base_url": BASE_URL,
+        "model": MODEL,
+        "timeout_s": 5.0,
+        "provider": "openai_compatible",
+    }
+    client = HttpModelClient.from_settings(
+        settings, API_KEY, transport=transport)
+
+    client.complete(_request())
+
+    _, body, _, _ = transport.calls[0]
+    assert "reasoning_effort" not in body
+
+
+def test_the_token_cap_of_the_request_is_the_one_the_body_carries():
+    """The token cap is configuration, so the body carries the cap it is given."""
+    transport = _FakeTransport(_answer())
+    client = _client(transport)
+
+    client.complete(_request(max_output_tokens=1234))
+
+    _, body, _, _ = transport.calls[0]
+    assert body["max_tokens"] == 1234
+
+
 def test_the_request_goes_to_the_configured_endpoint():
     """The URL is the base URL and the endpoint of the configuration."""
     transport = _FakeTransport(_answer())
