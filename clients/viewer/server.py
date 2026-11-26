@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import unquote, urlsplit
 
+from aturb.verify.engineering import analyze_step
+from aturb.verify.step import StepLoadError
 from clients.viewer.edit_api import (
     EditHandler,
     RollbackHandler,
@@ -87,6 +89,26 @@ def resolve_port(env: Mapping[str, str] | None = None) -> int:
     return port
 
 
+def engineering_facts(workspace: LoadedWorkspace) -> dict | None:
+    """Return the engineering facts of the exported STEP of a workspace.
+
+    The facts are measured from the STEP file of the active revision. The
+    result is None when the workspace declares no STEP file or when the file
+    cannot be read: the measurement is advisory and never fails the manifest.
+    """
+    try:
+        step = resolve_artifact(workspace, "step_file")
+    except WorkspaceError:
+        return None
+    try:
+        return analyze_step(step).to_dict()
+    except (StepLoadError, OSError, ValueError):
+        return None
+    except Exception:
+        # A measurement is advisory: it never stops the manifest.
+        return None
+
+
 class ViewerHandler(BaseHTTPRequestHandler):
     """The request handler of the viewer server.
 
@@ -121,7 +143,10 @@ class ViewerHandler(BaseHTTPRequestHandler):
             if path == "/":
                 self._serve_asset("index.html")
             elif path == "/api/manifest":
-                self._send_json(200, self.viewer.workspace.manifest)
+                payload = dict(self.viewer.workspace.manifest)
+                payload["engineering"] = engineering_facts(
+                    self.viewer.workspace)
+                self._send_json(200, payload)
             elif path == HISTORY_PATH:
                 self._send_json(200, read_history_payload(
                     self.viewer.workspace))
