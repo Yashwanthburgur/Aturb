@@ -6,8 +6,7 @@ each part is then composed and verified as one assembly.
 
 The outcome is written to `out/assemblies/<assembly_id>/` inside the project:
 the compound STEP file and a portable `assembly_result.toml` that holds the
-verdict. The result file holds no host path, and its `step_file` is relative
-to the assembly output folder, so the viewer can open that folder as it is.
+verdict. The result file holds no host path.
 """
 
 from __future__ import annotations
@@ -70,10 +69,12 @@ def build_assembly(
     project_root = Path(project_root).resolve()
     manifest_path = _resolve_manifest(project_root, assembly_path)
     spec = load_assembly(manifest_path)
+    assembly_file = to_rel(project_root, manifest_path)
     part_results = _build_parts(spec, project_root, runner, timeout_s)
     failure = _part_failure(part_results)
     if failure:
-        return _failed_build(spec, part_results, failure, project_root)
+        return _failed_build(spec, part_results, failure, project_root,
+                             assembly_file)
     out_dir = _output_dir(project_root, spec.assembly_id)
     out_dir.mkdir(parents=True, exist_ok=True)
     step_path = out_dir / f"{spec.assembly_id}.step"
@@ -82,10 +83,12 @@ def build_assembly(
         compose_assembly_step(spec, part_steps, step_path)
         report = verify_assembly(spec, part_steps)
     except (AssemblyError, PathEscapeError) as exc:
-        return _failed_build(spec, part_results, str(exc), project_root)
+        return _failed_build(spec, part_results, str(exc), project_root,
+                             assembly_file)
     error = _verdict_error(report)
     status = "failed" if error else "ok"
-    _write_result(out_dir, spec, report, status, error, step_path.name)
+    _write_result(out_dir, spec, report, status, error, step_path.name,
+                  assembly_file)
     return AssemblyBuildResult(
         status=status,
         assembly_id=spec.assembly_id,
@@ -173,7 +176,8 @@ def _verdict_error(report: AssemblyReport) -> str:
 
 
 def _failed_build(spec: AssemblySpec, part_results: dict[str, BuildResult],
-                  error: str, project_root: Path) -> AssemblyBuildResult:
+                  error: str, project_root: Path,
+                  assembly_file: str) -> AssemblyBuildResult:
     """Write the failed result of the assembly and return it.
 
     The compound STEP of an earlier run is removed, so a failed build never
@@ -182,7 +186,7 @@ def _failed_build(spec: AssemblySpec, part_results: dict[str, BuildResult],
     out_dir = _output_dir(project_root, spec.assembly_id)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{spec.assembly_id}.step").unlink(missing_ok=True)
-    _write_result(out_dir, spec, None, "failed", error, "")
+    _write_result(out_dir, spec, None, "failed", error, "", assembly_file)
     return AssemblyBuildResult(
         status="failed",
         assembly_id=spec.assembly_id,
@@ -196,25 +200,23 @@ def _failed_build(spec: AssemblySpec, part_results: dict[str, BuildResult],
 
 
 def _write_result(out_dir: Path, spec: AssemblySpec, report: AssemblyReport | None,
-                  status: str, error: str, step_file: str) -> Path:
+                  status: str, error: str, step_file: str,
+                  assembly_file: str) -> Path:
     """Write the portable result file of the assembly and return its path."""
     path = out_dir / RESULT_FILE_NAME
-    _atomic_write(path, _result_text(spec, report, status, error, step_file))
+    _atomic_write(path, _result_text(
+        spec, report, status, error, step_file, assembly_file))
     return path
 
 
 def _result_text(spec: AssemblySpec, report: AssemblyReport | None, status: str,
-                 error: str, step_file: str) -> str:
+                 error: str, step_file: str, assembly_file: str) -> str:
     """Return the text of the portable result file of the assembly."""
     if report is None:
         component_count = len(spec.components)
-        all_valid = False
-        has_interference = False
-        all_mates_ok = False
+        all_valid = has_interference = all_mates_ok = False
         total_volume = 0.0
-        bbox_min = (0.0, 0.0, 0.0)
-        bbox_max = (0.0, 0.0, 0.0)
-        bbox_size = (0.0, 0.0, 0.0)
+        bbox_min = bbox_max = bbox_size = (0.0, 0.0, 0.0)
         pairs: tuple[PairVerification, ...] = ()
     else:
         component_count = report.component_count
@@ -230,6 +232,7 @@ def _result_text(spec: AssemblySpec, report: AssemblyReport | None, status: str,
         f"status = {toml_string(status)}",
         f"assembly_id = {toml_string(spec.assembly_id)}",
         f"assembly_name = {toml_string(spec.name)}",
+        f"assembly_file = {toml_string(assembly_file)}",
         f"step_file = {toml_string(step_file)}",
         f"component_count = {int(component_count)}",
         f"all_valid = {_bool(all_valid)}",

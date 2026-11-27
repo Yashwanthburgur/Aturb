@@ -1,4 +1,4 @@
-"""Command line interface: aturb build, aturb check, aturb eval and aturb assemble.
+"""Command line interface: aturb build, aturb check, aturb eval and the assembly commands.
 
 The build and check commands build a part through the active pack. ``build``
 reports the build; ``check`` then runs the neutral checks over the exported
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aturb.agent.generate_cli import add_generate_parser, run_generate_command
-from aturb.assembly.cli import run_assemble_command
+from aturb.assembly.cli import add_assembly_parsers, run_assemble_command, run_edit_assembly_command
 from aturb.config import ConfigError, active_pack, load_config, timeout_s
 from aturb.contract.runner import Runner
 from aturb.contract.types import BuildRequest, BuildResult
@@ -45,10 +45,7 @@ def main(argv: list[str] | None = None) -> int:
         part.add_argument("project_dir")
         part.add_argument("part_id")
         part.add_argument("--config", default=None)
-    assemble = sub.add_parser("assemble")
-    assemble.add_argument("project_dir")
-    assemble.add_argument("assembly_file")
-    assemble.add_argument("--config", default=None)
+    add_assembly_parsers(sub)
     evaluate = sub.add_parser("eval")
     evaluate.add_argument("tasks_dir")
     evaluate.add_argument("--config", default=None)
@@ -61,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "view":
         from clients.viewer.cli import run_view_command
         return run_view_command(args)
+    if args.command == "edit-assembly":
+        return run_edit_assembly_command(args)
 
     try:
         cfg = load_config(Path(args.config) if args.config else None)
