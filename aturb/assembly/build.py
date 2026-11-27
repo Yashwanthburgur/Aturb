@@ -11,22 +11,19 @@ verdict. The result file holds no host path.
 
 from __future__ import annotations
 
-import os
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from aturb.agent.record import toml_string
 from aturb.assembly.manifest import AssemblyError, AssemblySpec, load_assembly
 from aturb.contract.runner import Runner
 from aturb.contract.types import BuildRequest, BuildResult
-from aturb.verify.assembly import (
-    AssemblyReport,
-    PairVerification,
-    compose_assembly_step,
-    verify_assembly,
-)
+from aturb.workspace.io import atomic_write_text
 from aturb.workspace.paths import PathEscapeError, resolve_inside, to_rel
+
+if TYPE_CHECKING:
+    from aturb.verify.assembly import AssemblyReport, PairVerification
 
 OUT_DIR = "out"
 ASSEMBLY_DIR = "assemblies"
@@ -66,6 +63,8 @@ def build_assembly(
     produces no STEP file, a clash between two components and a mate whose
     clearance is not met all give a failed result and a clear error.
     """
+    from aturb.verify.assembly import compose_assembly_step, verify_assembly
+
     project_root = Path(project_root).resolve()
     manifest_path = _resolve_manifest(project_root, assembly_path)
     spec = load_assembly(manifest_path)
@@ -260,19 +259,8 @@ def _result_text(spec: AssemblySpec, report: AssemblyReport | None, status: str,
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    """Write a text to a file through a temporary file in the same folder."""
-    handle, name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
-    temporary = Path(name)
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:
-            stream.write(text)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
+    """Write a text to a file atomically, through the shared helper."""
+    atomic_write_text(path, text)
 
 
 def _bool(value: bool) -> str:

@@ -37,7 +37,7 @@ explanation, no summary and no text around it.
 
 FENCE = "```"
 
-VERSION_LENGTH = 16
+VERSION_LENGTH = 16  # starting default
 
 
 def compose_prompt(pack_prompt: str, requirement: str, feedback: str = "") -> str:

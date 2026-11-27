@@ -1,8 +1,7 @@
 """Command line interface: aturb build, aturb check, aturb eval and the assembly commands.
 
-The build and check commands build a part through the active pack. ``build``
-reports the build; ``check`` then runs the neutral checks over the exported
-STEP and prints one line per check.
+The build and check commands build a part through the active pack: ``build``
+reports the build and ``check`` runs the neutral checks over the exported STEP.
 
 The ``eval`` command runs a whole task set: it builds and scores every task
 folder of the set, writes the results to a dated file and prints one line per
@@ -54,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     add_generate_parser(sub)
     view = sub.add_parser("view")
     view.add_argument("workspace")
+    view.add_argument("--config", default=None)
     args = parser.parse_args(argv)
     if args.command == "view":
         from clients.viewer.cli import run_view_command

@@ -19,8 +19,6 @@ from pathlib import Path
 from aturb.agent.config import agent_settings, read_api_key
 from aturb.agent.model import HttpModelClient
 from aturb.agent.types import AgentError
-from aturb.assembly.agent import edit_assembly
-from aturb.assembly.build import build_assembly
 from aturb.assembly.manifest import AssemblyError
 from aturb.config import ConfigError, active_pack, load_config, timeout_s
 from aturb.contract.runner import Runner
@@ -48,6 +46,8 @@ def run_assemble_command(
     timeout: int,
 ) -> int:
     """Build and verify one assembly and print one line about the outcome."""
+    from aturb.assembly.build import build_assembly
+
     project = Path(args.project_dir).resolve()
     try:
         result = build_assembly(
@@ -73,6 +73,8 @@ def run_edit_assembly_command(args: argparse.Namespace) -> int:
     not verify is never promoted: the command reports the failure and the
     live project stays as it was.
     """
+    from aturb.assembly.agent import edit_assembly
+
     project = Path(args.project_dir).resolve()
     try:
         cfg = load_config(Path(args.config) if args.config else None)

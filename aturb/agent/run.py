@@ -28,7 +28,7 @@ REQUIREMENT_SUFFIX = ".md"
 
 CHARS_PER_TOKEN = 4  # starting default
 TOKENS_PER_MTOK = 1_000_000
-ATTEMPTS = 1
+ATTEMPTS = 1  # starting default
 
 
 @dataclass(frozen=True)

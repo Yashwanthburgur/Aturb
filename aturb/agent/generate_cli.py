@@ -4,17 +4,39 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from aturb.agent.config import agent_settings
-from aturb.agent.generate import DEFAULT_PART_ID, GenerateResult, generate_part
 from aturb.agent.record import toml_string
 from aturb.agent.types import AgentError
 from aturb.config import ConfigError, active_pack, timeout_s
-from aturb.evals.judge import sanitize_text
 from aturb.packs import PackError, discover, load_runner
+from aturb.workspace.io import atomic_write_text
+
+if TYPE_CHECKING:
+    from aturb.agent.generate import GenerateResult
 
 DEFAULT_OUT_ROOT = Path("evals/tmp/generate")  # starting default
 STAMP_FORMAT = "%Y-%m-%d_%H%M%S"
+
+
+def generate_part(*args, **kwargs):
+    """Run one generation through the core, loading the core only when used.
+
+    The core of the generation measures the geometry, so it loads the
+    measuring library. The wrapper keeps that cost out of the import of this
+    module, and it keeps the name of the core replaceable by the tests.
+    """
+    from aturb.agent.generate import generate_part as _generate_part
+
+    return _generate_part(*args, **kwargs)
+
+
+def sanitize_text(text: str) -> str:
+    """Return a text without a path of the host, loading the judge when used."""
+    from aturb.evals.judge import sanitize_text as _sanitize_text
+
+    return _sanitize_text(text)
 
 
 def add_generate_parser(subparsers) -> None:
@@ -23,7 +45,7 @@ def add_generate_parser(subparsers) -> None:
     parser.add_argument("prompt", nargs="?", default=None)
     parser.add_argument("--prompt-file", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=None)
-    parser.add_argument("--part-id", default=DEFAULT_PART_ID)
+    parser.add_argument("--part-id", default=None)
     parser.add_argument("--max-attempts", type=int, default=None)
     parser.add_argument("--config", default=None)
     parser.add_argument("--pack", default=None)
@@ -62,7 +84,7 @@ def write_generate_manifest(result: GenerateResult) -> Path:
             f"holes = {_holes(geometry.holes)}",
         ])
     path = workspace / "result.toml"
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines) + "\n")
     return path
 
 
@@ -139,13 +161,26 @@ def run_generate_command(args, cfg, packs_root, client_factory) -> int:
         client = client_factory(settings)
         result = generate_part(
             requirement, out_dir, client, runner, settings, manifests[name],
-            timeout_s(cfg), part_id=args.part_id)
+            timeout_s(cfg), part_id=_part_id(args))
         write_generate_manifest(result)
     except (AgentError, ConfigError, PackError, OSError, ValueError) as exc:
         print(str(exc))
         return 2
     print(format_generate_report(result))
     return 0 if result.status == "ok" else 1
+
+
+def _part_id(args) -> str:
+    """Return the part id of the request, or the default of the core.
+
+    The default of the core is read only when the request names no part, so
+    that the command line never loads the measuring library for it.
+    """
+    if getattr(args, "part_id", None):
+        return str(args.part_id)
+    from aturb.agent.generate import DEFAULT_PART_ID
+
+    return DEFAULT_PART_ID
 
 
 def _relative(workspace: Path, path: Path | None) -> str:

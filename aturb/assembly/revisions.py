@@ -8,10 +8,8 @@ is never rewritten, and the history is written atomically.
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
-import tempfile
 import tomllib
 from collections.abc import Sequence
 from pathlib import Path
@@ -19,7 +17,7 @@ from pathlib import Path
 from aturb.agent.record import toml_string
 from aturb.assembly.edit import _part_file
 from aturb.assembly.manifest import AssemblyError, AssemblySpec, load_assembly
-from aturb.assembly.prompt import _part_ids
+from aturb.workspace.io import atomic_copy, atomic_write_text
 from aturb.workspace.paths import PathEscapeError, resolve_inside, to_rel
 
 HISTORY_FILE_NAME = "assembly_history.toml"
@@ -161,6 +159,8 @@ def _assembly_file(project_root: Path, assembly_path: Path) -> str:
 def _snapshot(project_root: Path, out_dir: Path, spec: AssemblySpec,
               revision_id: str) -> None:
     """Copy the verified state of the assembly into a revision folder."""
+    from aturb.assembly.prompt import _part_ids
+
     revision_dir = out_dir / REVISIONS_DIR_NAME / revision_id
     if revision_dir.exists():
         shutil.rmtree(revision_dir)
@@ -245,24 +245,11 @@ def _strings(items: object) -> str:
     return "[" + ", ".join(toml_string(str(item)) for item in items) + "]"
 
 
-def _atomic_write(path: Path, data: str | bytes) -> None:
-    """Write data to a file through a temporary file in the same folder."""
-    payload = data.encode("utf-8") if isinstance(data, str) else data
-    handle, name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
-    temporary = Path(name)
-    try:
-        with os.fdopen(handle, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
+def _atomic_write(path: Path, text: str) -> None:
+    """Write a text to a file atomically, through the shared helper."""
+    atomic_write_text(path, text)
 
 
 def _atomic_copy(source: Path, target: Path) -> None:
-    """Copy a file into place through a temporary file in the same folder."""
-    target.parent.mkdir(parents=True, exist_ok=True)
-    _atomic_write(target, source.read_bytes())
+    """Copy a file into place atomically, through the shared helper."""
+    atomic_copy(source, target)
