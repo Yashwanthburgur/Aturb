@@ -11,6 +11,9 @@
     { kind: "step_file", label: "STEP export" },
     { kind: "native_file", label: "native artifact" }
   ];
+  var SINGLE_PART_PANELS = ["run-panel", "usage-panel", "build-panel",
+    "geometry-panel", "artifacts-panel", "prompt-panel", "history-panel"];
+  var ASSEMBLY_PANELS = ["engineering-panel", "assembly-panel"];
   var manifest = {};
   var mesh = null;
   var state = { editable: false, active_revision: null, has_history: false };
@@ -218,11 +221,25 @@
     renderStatus();
     renderAssembly();
   }
-  /* The assembly panel is built by its own module, so it is only asked for
-   * when the manifest holds an assembly. */
+  /* The assembly panel is built by its own module. */
   function renderAssembly() {
     var panel = global.AturbAssembly;
     if (panel && typeof panel.render === "function") { panel.render(manifest); }
+  }
+  /* An assembly workspace shows the assembly panels, not the part panels. */
+  function applyMode() {
+    const isAssembly = Boolean(
+      manifest && manifest.assembly && typeof manifest.assembly === "object");
+    SINGLE_PART_PANELS.forEach(function (id) {
+      var panel = byId(id);
+      if (panel && (isAssembly || id !== "history-panel" && id !== "prompt-panel")) {
+        panel.hidden = isAssembly;
+      }
+    });
+    ASSEMBLY_PANELS.forEach(function (id) {
+      var panel = byId(id);
+      if (panel && isAssembly) { panel.hidden = false; }
+    });
   }
   function objectOf(result) {
     return result.ok && result.body && typeof result.body === "object" ? result.body : {};
@@ -257,6 +274,7 @@
       state.has_history = history.has_history === true;
       renderAll();
       refreshHistory(history);
+      applyMode();
       var viewer = global.AturbViewer;
       if (!viewer) { return { manifest: manifest, mesh: mesh, history: history }; }
       if (mesh) {

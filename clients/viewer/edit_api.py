@@ -12,7 +12,6 @@ of the host are stripped and the credential of the environment is redacted.
 
 from __future__ import annotations
 
-import json
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -21,7 +20,6 @@ from io import BufferedIOBase
 from pathlib import Path
 
 from aturb.agent.config import agent_settings, read_api_key
-from aturb.agent.edit import edit_part
 from aturb.agent.model import HttpModelClient
 from aturb.agent.revisions import (
     RevisionError,
@@ -29,16 +27,19 @@ from aturb.agent.revisions import (
     load_history,
     rollback_revision,
 )
-from aturb.agent.types import ModelClient, ModelRequest, ModelResponse
+from aturb.agent.types import ModelClient
 from aturb.config import active_pack, load_config, timeout_s
 from aturb.packs import default_packs_root, discover, load_runner
-from clients.viewer.generate_api import (
-    REDACTED,
+from clients.viewer.generate_api import validate_local_request
+from clients.viewer.http_utils import (
+    MAX_BODY_BYTES as MAX_BODY_BYTES,
+)
+from clients.viewer.http_utils import (
     ApiError,
-    _content_length,
-    _safe,
-    _secrets,
-    validate_local_request,
+    SafeModelClient,
+    configured_secrets,
+    read_json_object,
+    sanitize_message,
 )
 from clients.viewer.workspace import LoadedWorkspace, load_workspace
 
@@ -121,12 +122,15 @@ class EditService:
     """
 
     def __init__(self, *, config_loader: Callable[[], dict] = load_config,
+                 config_path: Path | None = None,
                  packs_root: Path | None = None,
                  client_factory: Callable[[dict, str],
                                           ModelClient] | None = None,
                  lock: threading.Lock | None = None) -> None:
         """Take the seams the tests replace and the lock the services share."""
         self._config_loader = config_loader
+        self._config_path = (Path(config_path)
+                             if config_path is not None else None)
         self._packs_root = (Path(packs_root) if packs_root is not None
                             else default_packs_root())
         self._client_factory = client_factory or _default_client_factory
@@ -164,10 +168,12 @@ class EditService:
     def _edit(self, workspace: LoadedWorkspace, instruction: str
               ) -> tuple[LoadedWorkspace | None, dict]:
         """Resolve the seams, run the edit and reload the workspace."""
+        from aturb.agent.edit import edit_part
+
         base_root = _base_root(workspace)
         settings: dict | None = None
         try:
-            cfg = self._config_loader()
+            cfg = self._load_config()
             settings = agent_settings(cfg)
             name = active_pack(cfg)
             manifests = discover(self._packs_root)
@@ -177,29 +183,40 @@ class EditService:
             seconds = timeout_s(cfg)
             api_key = read_api_key(settings)
             client = self._client_factory(settings, api_key)
-            client = _SafeClient(client, _secrets(settings) + (api_key,))
+            client = SafeModelClient(
+                client, configured_secrets(settings) + (api_key,))
         except ApiError:
             raise
         except Exception as exc:
-            raise ApiError(422, _safe(str(exc), settings)) from None
+            raise ApiError(422, sanitize_message(str(exc), settings)) from None
         try:
             result = edit_part(base_root, instruction, client, runner, settings,
                                manifests[name], seconds)
         except RevisionError as exc:
-            raise ApiError(409, _safe(str(exc), settings)) from None
+            raise ApiError(409, sanitize_message(str(exc), settings)) from None
         except Exception as exc:
-            raise ApiError(422, _safe(str(exc), settings)) from None
+            raise ApiError(422, sanitize_message(str(exc), settings)) from None
         try:
             loaded = load_workspace(base_root)
         except Exception as exc:
-            raise ApiError(422, _safe(str(exc), settings)) from None
+            raise ApiError(422, sanitize_message(str(exc), settings)) from None
         payload = {"revision_id": result.revision_id,
                    "parent_revision": result.parent_revision,
                    "active_revision": result.active_revision, "promoted": result.promoted,
                    "status": result.status, "stop_reason": result.generate.stop_reason,
                    "attempts": result.generate.attempts,
-                   "error": _safe(result.error, settings)}
+                   "error": sanitize_message(result.error, settings)}
         return loaded, payload
+
+    def _load_config(self) -> dict:
+        """Return the configuration of the service.
+
+        The path of the command line wins over the loader of the tests, so a
+        viewer that was started with a configuration file uses that file.
+        """
+        if self._config_path is not None:
+            return load_config(self._config_path)
+        return self._config_loader()
 
     def _rollback(self, workspace: LoadedWorkspace, revision_id: str
                   ) -> tuple[LoadedWorkspace, dict]:
@@ -218,37 +235,6 @@ class EditService:
         return loaded, read_history_payload(loaded)
 
 
-class _SafeClient:
-    """A model client that keeps the credential out of every message.
-
-    The core writes the error of a failed run into the manifest of the
-    revision, so the credential is removed before the core ever sees it.
-    """
-
-    def __init__(self, client: ModelClient, secrets: tuple[str, ...]) -> None:
-        """Take the client and the credential values that must not escape."""
-        self._client = client
-        self._secrets = secrets
-
-    def complete(self, request: ModelRequest) -> ModelResponse:
-        """Answer with the client, or fail without the credential."""
-        try:
-            return self._client.complete(request)
-        except Exception as exc:
-            raise self._redacted(exc) from None
-
-    def _redacted(self, exc: Exception) -> Exception:
-        """Return the failure of the client without the credential in it."""
-        message = str(exc)
-        for secret in self._secrets:
-            if secret:
-                message = message.replace(secret, REDACTED)
-        try:
-            return type(exc)(message)
-        except TypeError:
-            return RuntimeError(message)
-
-
 def _read_field(headers: Message[str, str], rfile: BufferedIOBase, bound_port: int,
                 handler: object | None, field: str, missing: str) -> str:
     """Read one text field of one request, or refuse the request.
@@ -262,7 +248,7 @@ def _read_field(headers: Message[str, str], rfile: BufferedIOBase, bound_port: i
         raise ApiError(403, reason)
     if handler is None:
         raise ApiError(503, missing)
-    payload = _read_json(headers, rfile)
+    payload = read_json_object(headers, rfile)
     value = payload.get(field)
     if not isinstance(value, str) or not value.strip():
         raise ApiError(400, f"the {field} is missing or empty")
@@ -294,20 +280,6 @@ def _revision(entry) -> dict:
 def _base_root(workspace: LoadedWorkspace) -> Path:
     """Return the folder that owns the history of a workspace."""
     return Path(workspace.history_root or workspace.root)
-
-
-def _read_json(headers: Message[str, str], rfile: BufferedIOBase) -> dict:
-    """Read the body of one request and return the JSON object it holds."""
-    length = _content_length(headers)
-    try:
-        payload = json.loads(rfile.read(length).decode("utf-8"))
-    except UnicodeDecodeError:
-        raise ApiError(400, "the request body is not UTF-8") from None
-    except ValueError:
-        raise ApiError(400, "the request body is not JSON") from None
-    if not isinstance(payload, dict):
-        raise ApiError(400, "the request body is not a JSON object")
-    return payload
 
 
 def _default_client_factory(settings: dict, api_key: str) -> ModelClient:

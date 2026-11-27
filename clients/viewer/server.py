@@ -18,8 +18,6 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import unquote, urlsplit
 
-from aturb.verify.engineering import analyze_step
-from aturb.verify.step import StepLoadError
 from clients.viewer import assembly_edit_api
 from clients.viewer.assembly_api import AssemblyWorkspaceError, assembly_payload
 from clients.viewer.edit_api import (
@@ -37,7 +35,6 @@ from clients.viewer.generate_api import (
     read_requirement,
     run_generation,
 )
-from clients.viewer.mesh import MeshError, tessellate_step
 from clients.viewer.workspace import (
     DECLARED_ARTIFACT_KINDS,
     ArtifactMissingError,
@@ -100,7 +97,12 @@ def engineering_facts(workspace: LoadedWorkspace) -> dict | None:
     The facts are measured from the STEP file of the active revision. The
     result is None when the workspace declares no STEP file or when the file
     cannot be read: the measurement is advisory and never fails the manifest.
+    The measuring library is imported here, so a viewer that never asks for
+    the manifest never loads it.
     """
+    from aturb.verify.engineering import analyze_step
+    from aturb.verify.step import StepLoadError
+
     try:
         step = resolve_artifact(workspace, "step_file")
     except WorkspaceError:
@@ -280,6 +282,8 @@ class ViewerHandler(BaseHTTPRequestHandler):
 
     def _serve_mesh(self) -> None:
         """Serve the mesh of the exported STEP of the open workspace."""
+        from clients.viewer.mesh import MeshError, tessellate_step
+
         try:
             step = resolve_artifact(self.viewer.workspace, "step_file")
         except ArtifactMissingError:

@@ -13,8 +13,6 @@ it is removed from every message the endpoint answers.
 
 from __future__ import annotations
 
-import json
-import os
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -24,33 +22,27 @@ from io import BufferedIOBase
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from aturb.agent.config import DEFAULTS, agent_settings, read_api_key
-from aturb.agent.generate import DEFAULT_PART_ID, generate_part
+from aturb.agent.config import agent_settings, read_api_key
 from aturb.agent.generate_cli import DEFAULT_OUT_ROOT, STAMP_FORMAT, write_generate_manifest
 from aturb.agent.model import HttpModelClient
 from aturb.agent.types import ModelClient
 from aturb.config import active_pack, load_config, timeout_s
-from aturb.evals.judge import sanitize_text
 from aturb.packs import default_packs_root, discover, load_runner
+from clients.viewer.http_utils import (
+    MAX_BODY_BYTES as MAX_BODY_BYTES,
+)
+from clients.viewer.http_utils import (
+    ApiError,
+    read_json_object,
+    sanitize_message,
+)
 from clients.viewer.workspace import LoadedWorkspace, load_workspace
 
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
-MAX_BODY_BYTES = 65_536  # starting default
-REDACTED = "<redacted>"
 LOCAL_REFUSAL = "the request did not come from the local viewer"
 NO_HANDLER = "generation is not available"
 
 GenerateHandler = Callable[[str], tuple[LoadedWorkspace | None, dict]]
-
-
-class ApiError(Exception):
-    """Raised when the endpoint answers with an error status."""
-
-    def __init__(self, status: int, message: str) -> None:
-        """Take the HTTP status and the message of the answer."""
-        super().__init__(message)
-        self.status = status
-        self.message = message
 
 
 @dataclass(frozen=True)
@@ -91,15 +83,7 @@ def read_requirement(
         raise ApiError(403, reason)
     if handler is None:
         raise ApiError(503, NO_HANDLER)
-    length = _content_length(headers)
-    try:
-        payload = json.loads(rfile.read(length).decode("utf-8"))
-    except UnicodeDecodeError:
-        raise ApiError(400, "the request body is not UTF-8") from None
-    except ValueError:
-        raise ApiError(400, "the request body is not JSON") from None
-    if not isinstance(payload, dict):
-        raise ApiError(400, "the request body is not a JSON object")
+    payload = read_json_object(headers, rfile)
     requirement = payload.get("requirement")
     if not isinstance(requirement, str) or not requirement.strip():
         raise ApiError(400, "the requirement is missing or empty")
@@ -135,12 +119,15 @@ class GenerateService:
     """
 
     def __init__(self, *, config_loader: Callable[[], dict] = load_config,
+                 config_path: Path | None = None,
                  packs_root: Path | None = None,
                  client_factory: Callable[[dict, str],
                                           ModelClient] | None = None,
                  out_root: Path = DEFAULT_OUT_ROOT) -> None:
         """Take the seams the tests replace and the folder the workspaces go to."""
         self._config_loader = config_loader
+        self._config_path = (Path(config_path)
+                             if config_path is not None else None)
         self._packs_root = (Path(packs_root) if packs_root is not None
                             else default_packs_root())
         self._client_factory = client_factory or _default_client_factory
@@ -160,9 +147,11 @@ class GenerateService:
 
     def _generate(self, requirement: str) -> tuple[LoadedWorkspace | None, dict]:
         """Resolve the seams, run the generation and write the manifest."""
+        from aturb.agent.generate import DEFAULT_PART_ID, generate_part
+
         settings: dict | None = None
         try:
-            cfg = self._config_loader()
+            cfg = self._load_config()
             settings = agent_settings(cfg)
             name = active_pack(cfg)
             manifests = discover(self._packs_root)
@@ -175,21 +164,32 @@ class GenerateService:
         except ApiError:
             raise
         except Exception as exc:
-            raise ApiError(422, _safe(str(exc), settings)) from None
+            raise ApiError(422, sanitize_message(str(exc), settings)) from None
         workspace = self._allocate_workspace()
         result = generate_part(
             requirement, workspace, client, runner, settings, manifests[name],
             seconds, part_id=DEFAULT_PART_ID)
-        result = replace(result, error=_safe(result.error, settings))
+        result = replace(result, error=sanitize_message(
+            result.error, settings))
         try:
             write_generate_manifest(result)
             loaded = load_workspace(result.workspace)
         except Exception as exc:
-            raise ApiError(422, _safe(str(exc), settings)) from None
+            raise ApiError(422, sanitize_message(str(exc), settings)) from None
         payload = {"workspace": result.workspace.name, "status": result.status,
                    "stop_reason": result.stop_reason, "part_id": result.part_id,
                    "attempts": result.attempts, "error": result.error}
         return loaded, payload
+
+    def _load_config(self) -> dict:
+        """Return the configuration of the service.
+
+        The path of the command line wins over the loader of the tests, so a
+        viewer that was started with a configuration file uses that file.
+        """
+        if self._config_path is not None:
+            return load_config(self._config_path)
+        return self._config_loader()
 
     def _allocate_workspace(self) -> Path:
         """Return a fresh timestamped folder under the output root."""
@@ -205,45 +205,6 @@ class GenerateService:
 def _default_client_factory(settings: dict, api_key: str) -> ModelClient:
     """Build the model client of the configuration, on the server only."""
     return HttpModelClient.from_settings(settings, api_key)
-
-
-def _safe(text: str, settings: dict | None) -> str:
-    """Return a message without a path of the host and without a credential."""
-    cleaned = sanitize_text(text or "")
-    for secret in _secrets(settings):
-        if secret:
-            cleaned = cleaned.replace(secret, REDACTED)
-    return cleaned
-
-
-def _secrets(settings: dict | None) -> tuple[str, ...]:
-    """Return the credential values that must never reach the browser.
-
-    The default name is read as well, so a configuration that cannot be read
-    never leaks the credential of the environment.
-    """
-    names = {str(DEFAULTS.get("api_key_env", ""))}
-    if settings is not None:
-        names.add(str(settings.get("api_key_env", "")))
-    return tuple(value for name in names if name
-                 for value in [os.environ.get(name, "")] if value)
-
-
-def _content_length(headers: Message[str, str]) -> int:
-    """Return the length of the body, or refuse the request."""
-    raw = headers.get("Content-Length")
-    if raw is None:
-        raise ApiError(411, "the request has no Content-Length header")
-    try:
-        length = int(raw.strip())
-    except (AttributeError, ValueError):
-        raise ApiError(
-            400, "the Content-Length header is not a number") from None
-    if length < 0:
-        raise ApiError(400, "the Content-Length header is negative")
-    if length > MAX_BODY_BYTES:
-        raise ApiError(413, "the request body is too large")
-    return length
 
 
 def _address_reason(value: str | None, bound_port: int, origin: bool) -> str | None:

@@ -11,7 +11,6 @@ credential of the environment is redacted.
 
 from __future__ import annotations
 
-import json
 import threading
 from collections.abc import Callable
 from email.message import Message
@@ -20,8 +19,7 @@ from pathlib import Path
 
 from aturb.agent.config import agent_settings, read_api_key
 from aturb.agent.model import HttpModelClient
-from aturb.agent.types import ModelClient, ModelRequest, ModelResponse
-from aturb.assembly.agent import edit_assembly
+from aturb.agent.types import ModelClient
 from aturb.assembly.manifest import AssemblyError, AssemblySpec, load_assembly
 from aturb.assembly.revisions import (
     assembly_out_dir,
@@ -35,15 +33,18 @@ from clients.viewer.assembly_api import (
     AssemblyWorkspaceError,
     read_assembly_manifest,
 )
-from clients.viewer.generate_api import (
-    REDACTED,
+from clients.viewer.generate_api import validate_local_request
+from clients.viewer.http_utils import (
+    MAX_BODY_BYTES as MAX_BODY_BYTES,
+)
+from clients.viewer.http_utils import (
     ApiError,
-    _safe,
-    _secrets,
-    validate_local_request,
+    SafeModelClient,
+    configured_secrets,
+    read_json_object,
+    sanitize_message,
 )
 
-MAX_BODY_BYTES = 32_768  # starting default
 PROMPT_FILE_NAME = "agent.md"
 NO_EDIT_HANDLER = "assembly editing is not available"
 NO_ROLLBACK_HANDLER = "assembly rollback is not available"
@@ -155,6 +156,8 @@ class AssemblyEditService:
     def _edit(self, root: Path, path: Path, spec: AssemblySpec,
               instruction: str) -> dict:
         """Resolve the seams and run the bounded assembly edit of the core."""
+        from aturb.assembly.agent import edit_assembly
+
         settings: dict | None = None
         try:
             cfg = load_config(self._config_path)
@@ -167,7 +170,8 @@ class AssemblyEditService:
             runner = self._runner_factory(name, cfg, packs_root)
             api_key = read_api_key(settings)
             client = self._client_factory(settings, api_key)
-            client = _SafeClient(client, _secrets(settings) + (api_key,))
+            client = SafeModelClient(
+                client, configured_secrets(settings) + (api_key,))
             pack = manifests[name]
             prompt = (pack.pack_dir / pack.prompt_dir / PROMPT_FILE_NAME).read_text(
                 encoding="utf-8")
@@ -178,37 +182,13 @@ class AssemblyEditService:
         except ApiError:
             raise
         except Exception as exc:
-            raise ApiError(422, _safe(str(exc), settings)) from None
+            raise ApiError(422, sanitize_message(str(exc), settings)) from None
         return {"assembly_id": result.assembly_id, "status": result.status,
                 "stop_reason": result.stop_reason, "promoted": result.promoted,
                 "attempts": result.attempts, "revision_id": result.revision_id,
                 "parent_revision": result.parent_revision,
                 "updated_parts": list(result.updated_parts),
-                "error": _safe(result.error, settings)}
-
-
-class _SafeClient:
-    """A model client that keeps the credential out of every message."""
-
-    def __init__(self, client: ModelClient, secrets: tuple[str, ...]) -> None:
-        """Take the client and the credential values that must not escape."""
-        self._client = client
-        self._secrets = secrets
-
-    def complete(self, request: ModelRequest) -> ModelResponse:
-        """Answer with the client, or fail without the credential."""
-        try:
-            return self._client.complete(request)
-        except Exception as exc:
-            message = str(exc)
-            for secret in self._secrets:
-                if secret:
-                    message = message.replace(secret, REDACTED)
-            try:
-                failure = type(exc)(message)
-            except TypeError:
-                failure = RuntimeError(message)
-            raise failure from None
+                "error": sanitize_message(result.error, settings)}
 
 
 def _read_field(headers: Message[str, str], rfile: BufferedIOBase,
@@ -226,42 +206,11 @@ def _read_field(headers: Message[str, str], rfile: BufferedIOBase,
         raise ApiError(403, reason)
     if handler is None:
         raise ApiError(503, missing)
-    payload = _read_json(headers, rfile)
+    payload = read_json_object(headers, rfile)
     value = payload.get(field)
     if not isinstance(value, str) or not value.strip():
         raise ApiError(400, f"the {field} is missing or empty")
     return value.strip()
-
-
-def _read_json(headers: Message[str, str], rfile: BufferedIOBase) -> dict:
-    """Read the body of one request and return the JSON object it holds."""
-    length = _content_length(headers)
-    try:
-        payload = json.loads(rfile.read(length).decode("utf-8"))
-    except UnicodeDecodeError:
-        raise ApiError(400, "the request body is not UTF-8") from None
-    except ValueError:
-        raise ApiError(400, "the request body is not JSON") from None
-    if not isinstance(payload, dict):
-        raise ApiError(400, "the request body is not a JSON object")
-    return payload
-
-
-def _content_length(headers: Message[str, str]) -> int:
-    """Return the length of the body, or refuse the request."""
-    raw = headers.get("Content-Length")
-    if raw is None:
-        raise ApiError(411, "the request has no Content-Length header")
-    try:
-        length = int(raw.strip())
-    except (AttributeError, ValueError):
-        raise ApiError(
-            400, "the Content-Length header is not a number") from None
-    if length < 0:
-        raise ApiError(400, "the Content-Length header is negative")
-    if length > MAX_BODY_BYTES:
-        raise ApiError(413, "the request body is too large")
-    return length
 
 
 def _project_root(workspace_dir: Path, assembly_file: str) -> Path | None:
