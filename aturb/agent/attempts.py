@@ -14,6 +14,7 @@ from typing import Sequence
 
 from aturb.agent.record import FILE_SUFFIX as AGENT_FILE_SUFFIX
 from aturb.agent.record import toml_string
+from aturb.workspace.io import atomic_write_text
 
 ATTEMPT_KEYS = (
     "task_id", "part_id", "attempt", "prompt_version", "input_tokens",
@@ -75,7 +76,7 @@ def write_attempts(path: Path, attempts: Sequence[AttemptRecord]) -> Path:
     text = "\n\n".join(_record(attempt) for attempt in attempts)
     if text:
         text += "\n"
-    path.write_text(text, encoding="utf-8")
+    atomic_write_text(path, text)
     return path
 
 

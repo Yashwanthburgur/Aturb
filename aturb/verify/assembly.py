@@ -125,6 +125,8 @@ def compose_assembly_step(
         if written is False or not temporary.is_file() or temporary.stat().st_size == 0:
             raise AssemblyError(
                 f"the assembly STEP file {out_step.name} was not written")
+        with temporary.open("r+b") as stream:
+            os.fsync(stream.fileno())
         os.replace(temporary, out_step)
     except BaseException:
         temporary.unlink(missing_ok=True)

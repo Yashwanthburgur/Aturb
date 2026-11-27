@@ -32,6 +32,8 @@ def write_json(path: Path, data: dict) -> None:
         ) as handle:
             tmp_path = Path(handle.name)
             json.dump(data, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(tmp_path, path)
     except BaseException:
         if tmp_path is not None:

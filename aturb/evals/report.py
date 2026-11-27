@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from aturb.evals.result import TaskResult
+from aturb.workspace.io import atomic_write_text
 
 RECORD_KEYS = ("task_id", "part_id", "status", "score", "error")
 
@@ -48,7 +49,7 @@ def write_results(results_dir: Path, results: list[TaskResult]) -> Path:
     text = "\n\n".join(blocks)
     if text:
         text += "\n"
-    path.write_text(text, encoding="utf-8")
+    atomic_write_text(path, text)
     return path
 
 

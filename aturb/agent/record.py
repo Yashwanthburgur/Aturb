@@ -23,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from aturb.agent.types import AgentRun
+from aturb.workspace.io import atomic_write_text
 
 RECORD_KEYS = ("task_id", "part_id", "provider", "model", "prompt_version",
                "input_tokens", "output_tokens", "cost_usd", "attempts",
@@ -58,7 +59,7 @@ def write_agent_runs(results_dir: Path, runs: list[AgentRun]) -> Path:
     text = "\n\n".join(blocks)
     if text:
         text += "\n"
-    path.write_text(text, encoding="utf-8")
+    atomic_write_text(path, text)
     return path
 
 

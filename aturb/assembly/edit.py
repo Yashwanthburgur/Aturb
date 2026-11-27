@@ -11,7 +11,6 @@ change that only works together is never promoted one part at a time.
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import tempfile
@@ -22,6 +21,7 @@ from pathlib import Path
 from aturb.assembly.build import AssemblyBuildResult, build_assembly
 from aturb.assembly.manifest import AssemblyError
 from aturb.contract.runner import Runner
+from aturb.workspace.io import atomic_write_text
 from aturb.workspace.paths import PathEscapeError, resolve_inside, to_rel
 
 PARTS_DIR = "parts"
@@ -182,19 +182,8 @@ def _restore(project_root: Path, originals: Mapping[str, str]) -> None:
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    """Write a text to a file through a temporary file in the same folder."""
-    handle, name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
-    temporary = Path(name)
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:
-            stream.write(text)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
+    """Write a text to a file atomically, through the shared helper."""
+    atomic_write_text(path, text)
 
 
 def _failed_edit(assembly_id: str, error: str) -> AssemblyEditResult:
