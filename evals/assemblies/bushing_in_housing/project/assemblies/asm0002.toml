@@ -1,0 +1,24 @@
+# The assembly of the task bushing_in_housing: a housing and the flanged
+# bushing that sits in its bore.
+#
+# The manifest holds no host path: every part is named by its part id and the
+# core resolves the id inside the project.
+
+assembly_id = "asm0002"
+name = "Housing and flanged bushing"
+
+[[components]]
+name = "housing"
+part_id = "hsg0001"
+position = [0.0, 0.0, 0.0]
+
+[[components]]
+name = "bushing"
+part_id = "bsh0001"
+position = [0.0, 0.0, 0.0]
+
+[[mates]]
+part_a = "housing"
+part_b = "bushing"
+min_clearance_mm = 0.15
+max_clearance_mm = 0.25

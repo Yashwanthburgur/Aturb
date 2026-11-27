@@ -1,0 +1,13 @@
+# The assembly edit task bushing_in_housing.
+#
+# The task names the assembly, the project that holds it and the file that
+# carries the instruction. The expected values of the edit live in
+# expected_edit.toml, outside the project, so the agent never reads them.
+
+task_id = "bushing_in_housing"
+assembly_id = "asm0002"
+name = "Upsize the bushing in its housing"
+description = "Widen the bushing and the bore of the housing that holds it, and keep the 0.2 mm radial clearance between them."
+project_dir = "project"
+assembly_file = "assemblies/asm0002.toml"
+requirement_file = "requirements/edit.md"

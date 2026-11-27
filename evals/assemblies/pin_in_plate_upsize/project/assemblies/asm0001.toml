@@ -1,0 +1,24 @@
+# The assembly of the task pin_in_plate_upsize: a mounting plate and the
+# shoulder pin that sits in its bore.
+#
+# The manifest holds no host path: every part is named by its part id and the
+# core resolves the id inside the project.
+
+assembly_id = "asm0001"
+name = "Mounting plate and shoulder pin"
+
+[[components]]
+name = "plate"
+part_id = "plt0001"
+position = [0.0, 0.0, 0.0]
+
+[[components]]
+name = "pin"
+part_id = "shf0001"
+position = [0.0, 0.0, -5.0]
+
+[[mates]]
+part_a = "plate"
+part_b = "pin"
+min_clearance_mm = 0.15
+max_clearance_mm = 0.25

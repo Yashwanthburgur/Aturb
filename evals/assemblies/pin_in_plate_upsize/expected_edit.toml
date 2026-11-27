@@ -1,0 +1,12 @@
+# The expected result of the edit of the assembly asm0001.
+#
+# The values are the ones the edited assembly must show: the volume of the
+# whole assembly, the size of its bounding box, the clearance of the mate and
+# the verdict of the interference check.
+
+assembly_id = "asm0001"
+total_volume_mm3 = 70479.096455
+bbox_size_mm = [100.0, 60.0, 23.5]
+min_clearance_mm = 0.2
+has_interference = false
+updated_parts = ["plt0001", "shf0001"]
