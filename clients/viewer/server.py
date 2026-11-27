@@ -20,6 +20,7 @@ from urllib.parse import unquote, urlsplit
 
 from aturb.verify.engineering import analyze_step
 from aturb.verify.step import StepLoadError
+from clients.viewer import assembly_edit_api
 from clients.viewer.assembly_api import AssemblyWorkspaceError, assembly_payload
 from clients.viewer.edit_api import (
     EditHandler,
@@ -66,6 +67,9 @@ GENERATE_PATH = "/api/generate"
 HISTORY_PATH = "/api/history"
 EDIT_PATH = "/api/edit"
 ROLLBACK_PATH = "/api/rollback"
+ASSEMBLY_HISTORY_PATH = "/api/assembly/history"
+ASSEMBLY_EDIT_PATH = "/api/assembly/edit"
+ASSEMBLY_ROLLBACK_PATH = "/api/assembly/rollback"
 ASSET_MISSING = "the requested asset is not available"
 
 
@@ -165,12 +169,18 @@ class ViewerHandler(BaseHTTPRequestHandler):
             elif path == HISTORY_PATH:
                 self._send_json(200, read_history_payload(
                     self.viewer.workspace))
+            elif path == ASSEMBLY_HISTORY_PATH:
+                self._send_json(200, assembly_edit_api.read_assembly_history_payload(
+                    self.viewer.assembly_edit_service))
+                return
             elif path == "/api/mesh":
                 self._serve_mesh()
             elif path.startswith(FILE_PREFIX):
                 self._serve_file(path[len(FILE_PREFIX):])
             else:
                 self._serve_asset(path[1:])
+        except ApiError as exc:
+            self._send_json(exc.status, {"error": exc.message})
         except Exception:
             if not self._responded:
                 self._send_json(
@@ -206,6 +216,20 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 outcome = run_rollback(
                     self.viewer.rollback_handler, self.viewer.workspace,
                     revision_id)
+            elif path == ASSEMBLY_EDIT_PATH:
+                service = cast("assembly_edit_api.AssemblyEditService",
+                               self.viewer.assembly_edit_service)
+                instruction = assembly_edit_api.read_assembly_instruction(
+                    self.headers, self.rfile, self.viewer.bound_port, service)
+                self._send_json(200, service.edit(instruction))
+                return
+            elif path == ASSEMBLY_ROLLBACK_PATH:
+                service = cast("assembly_edit_api.AssemblyEditService",
+                               self.viewer.assembly_edit_service)
+                revision_id = assembly_edit_api.read_assembly_revision(
+                    self.headers, self.rfile, self.viewer.bound_port, service)
+                self._send_json(200, service.rollback(revision_id))
+                return
             else:
                 raise ApiError(404, "unknown endpoint")
             if outcome.workspace is not None:
@@ -335,7 +359,8 @@ class ViewerServer(ThreadingHTTPServer):
                  static_dir: Path | None = None, host: str = LOOPBACK_HOST,
                  generate_handler: GenerateHandler | None = None,
                  edit_handler: EditHandler | None = None,
-                 rollback_handler: RollbackHandler | None = None):
+                 rollback_handler: RollbackHandler | None = None,
+                 assembly_edit_service: assembly_edit_api.AssemblyEditService | None = None):
         """Bind the server to the loopback address."""
         self.workspace = workspace
         self.static_dir = Path(
@@ -343,6 +368,7 @@ class ViewerServer(ThreadingHTTPServer):
         self.generate_handler = generate_handler
         self.edit_handler = edit_handler
         self.rollback_handler = rollback_handler
+        self.assembly_edit_service = assembly_edit_service
         super().__init__((_check_loopback(host), port), ViewerHandler)
 
     @property
@@ -369,6 +395,7 @@ def create_server(
     generate_handler: GenerateHandler | None = None,
     edit_handler: EditHandler | None = None,
     rollback_handler: RollbackHandler | None = None,
+    assembly_edit_service: assembly_edit_api.AssemblyEditService | None = None,
 ) -> ViewerServer:
     """Bind the viewer server to the loopback address and return it.
 
@@ -379,7 +406,7 @@ def create_server(
         raise ValueError(
             f"the port must be between 0 and {MAX_PORT}, got {chosen}")
     return ViewerServer(workspace, chosen, static_dir, host, generate_handler,
-                        edit_handler, rollback_handler)
+                        edit_handler, rollback_handler, assembly_edit_service)
 
 
 def serve_in_thread(server: ViewerServer) -> threading.Thread:

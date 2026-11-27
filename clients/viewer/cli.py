@@ -15,6 +15,7 @@ from argparse import Namespace
 from collections.abc import Callable
 from pathlib import Path
 
+from clients.viewer.assembly_edit_api import AssemblyEditService
 from clients.viewer.edit_api import EditHandler, EditService, RollbackHandler
 from clients.viewer.generate_api import GenerateHandler, GenerateService
 from clients.viewer.server import ViewerServer, create_server
@@ -32,6 +33,7 @@ def start_viewer(
     generate_handler: GenerateHandler | None = None,
     edit_handler: EditHandler | None = None,
     rollback_handler: RollbackHandler | None = None,
+    assembly_edit_service: AssemblyEditService | None = None,
 ) -> ViewerServer:
     """Load the workspace and bind the loopback-only viewer server.
 
@@ -39,7 +41,7 @@ def start_viewer(
     when the port is not a port number and ``OSError`` when the port cannot
     be bound. The generation and the edit services are built here, but they
     resolve the configuration, the pack and the credential only when a request
-    arrives, so a read-only viewer needs neither. Both services share one
+    arrives, so a read-only viewer needs neither. Every service shares one
     lock, so a generation, an edit and a rollback never race.
     """
     workspace = load_workspace(Path(workspace_path))
@@ -47,9 +49,12 @@ def start_viewer(
     service = EditService(lock=_shared_lock(handler))
     editor = edit_handler if edit_handler is not None else service.edit
     roller = rollback_handler if rollback_handler is not None else service.rollback
+    assembly = assembly_edit_service or AssemblyEditService(
+        workspace.root, lock=_shared_lock(handler))
     return create_server(
         workspace, port=port, static_dir=static_dir, generate_handler=handler,
-        edit_handler=editor, rollback_handler=roller)
+        edit_handler=editor, rollback_handler=roller,
+        assembly_edit_service=assembly)
 
 
 def _shared_lock(handler: object) -> threading.Lock:
