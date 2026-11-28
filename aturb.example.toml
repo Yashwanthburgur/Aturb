@@ -20,6 +20,12 @@ api_key_env = "ATURB_AGENT_API_KEY"     # starting default
 max_input_tokens = 20000                # starting default
 max_output_tokens = 8000                # starting default
 max_cost_usd = 0.50                     # starting default
+# The bounds of the bounded improvement loop. The attempt limit stops the loop,
+# and the three cumulative caps stop it before a call that would pass them.
+max_attempts = 3                        # starting default
+max_total_cost_usd = 0.75               # starting default
+max_total_input_tokens = 60000          # starting default
+max_total_output_tokens = 24000         # starting default
 input_price_per_mtok = 0.0              # starting default
 output_price_per_mtok = 0.0             # starting default
 timeout_s = 120                         # starting default
