@@ -1,4 +1,6 @@
-Architecture decision records, one per decision, 10 to 20 lines each.
+Architecture decision records, one per decision. Each record states the context,
+the decision and the consequences, and records only behaviour that is
+implemented and verified.
 
 - [ADR-0001: Code first](0001-code-first.md) — the model writes CAD code; there is no intermediate language and no tool per CAD operation.
 - [ADR-0002: FreeCAD first](0002-freecad-first.md) — FreeCAD, run headless, is the first backend pack.
@@ -14,3 +16,4 @@ Architecture decision records, one per decision, 10 to 20 lines each.
 - [ADR-0012: Iterative editing and the revision history](0012-iterative-editing-and-revisions.md) — every edit builds a new immutable `revisions/rNNNN/` workspace, `history.toml` names the active one, and a rollback selects a verified revision without deleting the later ones.
 - [ADR-0013: Multi-part assemblies](0013-assemblies.md) — every part stays standalone and is built through the runner contract; an assembly is a portable manifest, composed and verified neutrally on exported STEP files, and an edit is promoted only when the whole assembly verifies.
 - [ADR-0014: The assembly agent](0014-assembly-agent.md) — the assembly edit is one stateless message with an exact text delimiter contract, a bounded repair loop that replaces the feedback with the exact failures, and a non-destructive promotion into an immutable revision history.
+- [ADR-0015: Lazy CLI startup and shared safety primitives](0015-lazy-cli-startup-and-shared-safety.md) — the heavy geometry modules load only when a command measures, all seven subcommands take `--config`, one module owns atomic single-file persistence and one owns the viewer HTTP guards, and the viewer panels follow the manifest.
