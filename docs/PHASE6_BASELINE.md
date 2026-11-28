@@ -73,7 +73,8 @@ No task failed and no task errored, so there is no failure to write down. The
 run is recorded here as it was measured.
 
 The agent run of each task succeeded: one call, one candidate file written, one
-attempt, [`status = "ok"`](../evals/tmp/baseline/2026-11-22_143053_agent.toml:11).
+attempt, `status = "ok"` in
+`evals/tmp/baseline/2026-11-22_143053_agent.toml`.
 The build of each candidate in FreeCAD 1.0.1 succeeded too, and the exported
 STEP file was read back with build123d.
 
@@ -116,8 +117,9 @@ Phase 6 work was for:
 - The candidate of `plate_fillet` selected the fillet edges with the helper,
   with [`helper.corner_edges()`](../packs/freecad/helper/select.py:61) and
   [`helper.assert_count()`](../packs/freecad/helper/select.py:111), and created
-  the [`PartDesign::Fillet`](../evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py:46)
-  feature itself. The helper selected and asserted; it created nothing. The
+  the `PartDesign::Fillet` feature of
+  `evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py`
+  itself. The helper selected and asserted; it created nothing. The
   twelve faces of the measured solid are the four fillet faces added to the
   eight faces of the plain plate.
 - The conventions checker is advisory and never blocks a build.
@@ -129,9 +131,9 @@ file`. The task still scored 1.0. The finding is recorded here as it was
 
 The candidate files are not committed. They stay in the git-ignored scratch
 folder as
-[`plt0001_candidate.py`](../evals/tmp/agent/plate_2holes/project/parts/plt0001_candidate.py)
+`evals/tmp/agent/plate_2holes/project/parts/plt0001_candidate.py`
 and
-[`plt0002_candidate.py`](../evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py),
+`evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py`,
 and the raw response of the model is not in this repository.
 
 ## The exact commands
@@ -169,10 +171,10 @@ timeout_s = 300
 ```
 
 The run wrote two dated files in the git-ignored folder
-[`evals/tmp/baseline`](../evals/tmp/baseline):
-[`2026-11-22_143053.toml`](../evals/tmp/baseline/2026-11-22_143053.toml) holds
+`evals/tmp/baseline`:
+`evals/tmp/baseline/2026-11-22_143053.toml` holds
 the result of the tasks and
-[`2026-11-22_143053_agent.toml`](../evals/tmp/baseline/2026-11-22_143053_agent.toml)
+`evals/tmp/baseline/2026-11-22_143053_agent.toml`
 holds the record of the agent runs.
 
 ## A model call is not deterministic

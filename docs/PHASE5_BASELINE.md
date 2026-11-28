@@ -91,7 +91,7 @@ a `ThroughAll` pocket. The pocket cut no material, so the exported solid is the
 plain 120 × 60 × 5 plate of 36000 mm³ with no hole in it.
 
 The candidate file is not committed. It stays in the git-ignored scratch folder
-as [`plt0001_candidate.py`](../evals/tmp/agent/plate_2holes/project/parts/plt0001_candidate.py),
+as `evals/tmp/agent/plate_2holes/project/parts/plt0001_candidate.py`,
 and the raw response of the model is not in this repository.
 
 ## The exact commands
@@ -128,10 +128,10 @@ timeout_s = 300
 ```
 
 The run wrote two dated files in the git-ignored folder
-[`evals/tmp/baseline`](../evals/tmp/baseline):
-[`2026-11-21_210901.toml`](../evals/tmp/baseline/2026-11-21_210901.toml) holds
+`evals/tmp/baseline`:
+`evals/tmp/baseline/2026-11-21_210901.toml` holds
 the result of the task and
-[`2026-11-21_210901_agent.toml`](../evals/tmp/baseline/2026-11-21_210901_agent.toml)
+`evals/tmp/baseline/2026-11-21_210901_agent.toml`
 holds the record of the agent run.
 
 ## A model call is not deterministic

@@ -26,7 +26,7 @@ contracts the evaluation already depends on.
 ## Decision
 
 **The loop is bounded and lives in the agent layer.** The loop is a new module
-in [`aturb/agent/`](../aturb/agent/), not in the evaluator and not in a pack.
+in [`aturb/agent/`](../../aturb/agent/), not in the evaluator and not in a pack.
 It is bounded by an explicit attempt limit, by cumulative token caps and by a
 cumulative cost cap, and the budget is checked before every call, with the
 same estimate the single-shot path uses. The bounds are configuration values
@@ -44,7 +44,7 @@ with starting defaults; their numbers are not fixed here.
 **Two failure kinds are not repairable.** `runner_crash` and `input_error`
 describe a failure of the runner or of the request, not of the part file, so a
 rewrite cannot fix them and the loop stops. The other six kinds of
-[`FailureKind`](../aturb/contract/types.py:11) — `rejected_unsafe`,
+[`FailureKind`](../../aturb/contract/types.py:11) — `rejected_unsafe`,
 `syntax_error`, `runtime_error`, `timeout`, `invalid_geometry` and
 `export_failed` — are repairable by writing the file again, and all of them
 produce feedback.
@@ -77,7 +77,7 @@ carry the expected value of a check, the tolerance of a check, the name of an
 evaluator check, the verdict of an individual check, the failure message of an
 evaluator check, the score of the task, the answer file, the answer spec, the
 contents or the path of `project/expect/`, or a raw
-[`CheckResult`](../aturb/verify/result.py:20). The agent is told what its own
+[`CheckResult`](../../aturb/verify/result.py:20). The agent is told what its own
 candidate measured, never which check failed and never what the target was.
 
 **The leak is prevented by the type and the parameters, not by a convention.**
@@ -94,7 +94,7 @@ judges the candidate; nothing it learns crosses into the agent layer. The
 scratch workspace keeps `project/expect/`, as ADR-0008 requires.
 
 **The agent-run record keeps its eleven fields.** The record of
-[`aturb/agent/record.py`](../aturb/agent/record.py:27) does not grow, so every
+[`aturb/agent/record.py`](../../aturb/agent/record.py:27) does not grow, so every
 reader of it keeps working. Three fields change meaning, and only in the
 direction of more information: `attempts` is the number of model calls made,
 `input_tokens`, `output_tokens` and `cost_usd` are the sums over all attempts,
@@ -111,8 +111,8 @@ the agent path never reads it and it never enters a prompt.
 
 **The evaluation contracts are frozen.** The runner contract stays at version
 `0.1` with its eight failure kinds, the static precheck of the pack is
-unchanged, [`run_task()`](../aturb/evals/runner.py:40) keeps its signature and
-its five-field [`TaskResult`](../aturb/evals/result.py:30), the answer schema
+unchanged, [`run_task()`](../../aturb/evals/runner.py:40) keeps its signature and
+its five-field [`TaskResult`](../../aturb/evals/result.py:30), the answer schema
 keeps its five keys, and the Phase 4 scoring rule is untouched. The score of a
 task is the score of the last judged candidate; the loop only gives the agent
 another chance before the score is taken.

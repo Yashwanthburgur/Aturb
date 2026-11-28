@@ -115,7 +115,7 @@ Three of the four tasks did not reach a passing candidate, so the failures are
 written down here exactly as they happened.
 
 **Every attempt of the run**, from
-[`2026-11-23_064654_attempts.toml`](../evals/tmp/phase7_baseline/2026-11-23_064654_attempts.toml):
+`evals/tmp/phase7_baseline/2026-11-23_064654_attempts.toml`:
 
 | Task           | Attempt | Prompt version     | In / out tokens | Status   | Outcome                     | Score | Failed checks          |
 | -------------- | ------- | ------------------ | --------------- | -------- | --------------------------- | ----- | ---------------------- |
@@ -191,8 +191,9 @@ measured:
   fillet edges with the helper, with
   [`helper.corner_edges()`](../packs/freecad/helper/select.py:61) and
   [`helper.assert_count()`](../packs/freecad/helper/select.py:111), and created
-  the [`PartDesign::Fillet`](../evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py:42)
-  feature itself. The helper selected and asserted; it created nothing.
+  the `PartDesign::Fillet` feature of
+  `evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py`
+  itself. The helper selected and asserted; it created nothing.
 - **`plate_step` never reached the helper.** The response of the model was cut
   off at the 16000 output-token cap of the configuration, so the candidate file
   ends in the middle of an expression and the precheck refused it with
@@ -210,10 +211,10 @@ not at the top of the file` — and one for the candidate of `plate_fillet` —
 
 The candidate files are not committed. They stay in the git-ignored scratch
 folder as
-[`plt0001_candidate.py`](../evals/tmp/agent/plate_2holes/project/parts/plt0001_candidate.py),
-[`plt0002_candidate.py`](../evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py)
+`evals/tmp/agent/plate_2holes/project/parts/plt0001_candidate.py`,
+`evals/tmp/agent/plate_fillet/project/parts/plt0002_candidate.py`
 and
-[`plt0004_candidate.py`](../evals/tmp/agent/plate_step/project/parts/plt0004_candidate.py),
+`evals/tmp/agent/plate_step/project/parts/plt0004_candidate.py`,
 and the raw response of the model is not in this repository.
 
 ## The exact commands
@@ -259,12 +260,12 @@ timeout_s = 300
 ```
 
 The run wrote three dated files in the git-ignored folder
-[`evals/tmp/phase7_baseline`](../evals/tmp/phase7_baseline):
-[`2026-11-23_064654.toml`](../evals/tmp/phase7_baseline/2026-11-23_064654.toml)
+`evals/tmp/phase7_baseline`:
+`evals/tmp/phase7_baseline/2026-11-23_064654.toml`
 holds the result of the tasks,
-[`2026-11-23_064654_agent.toml`](../evals/tmp/phase7_baseline/2026-11-23_064654_agent.toml)
+`evals/tmp/phase7_baseline/2026-11-23_064654_agent.toml`
 holds the record of the agent runs, and
-[`2026-11-23_064654_attempts.toml`](../evals/tmp/phase7_baseline/2026-11-23_064654_attempts.toml)
+`evals/tmp/phase7_baseline/2026-11-23_064654_attempts.toml`
 holds the record of every attempt.
 
 ## A model call is not deterministic

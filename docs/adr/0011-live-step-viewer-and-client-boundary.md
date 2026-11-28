@@ -17,14 +17,18 @@ The core is CAD-neutral, language-neutral and interface-neutral
 ([`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)). A browser, an HTTP server and a
 user interface are an interface. They belong to a client, not to the core.
 
-The repository is small on purpose. [`pyproject.toml`](../pyproject.toml)
+The repository is small on purpose. [`pyproject.toml`](../../pyproject.toml)
 declares two runtime dependencies, `build123d` and `pyyaml`, and two development
 dependencies, `pytest` and `ruff`. A viewer that needs a package manager, a
 bundler and a runtime download from a content delivery network is a different
 kind of project.
 
-The command line is nearly full. [`aturb/cli.py`](../aturb/cli.py) is 295 lines
-and the limit is 300, so a new command has five lines to spend.
+The command line is nearly full. [`aturb/cli.py`](../../aturb/cli.py) is 297 lines
+and the limit is 300, so a new command has three lines to spend.
+
+> **[Updated]** The line count was 295 when this record was written. The verified
+> count today is **297 lines**, so the headroom below the 300-line limit is
+> **three lines**, not five.
 
 The facts below were measured in-session on 2026-11-25 and are the only facts
 this record relies on.
@@ -46,31 +50,41 @@ It returns a two-element tuple: `vertices`, a `list[Vector]`, and `triangles`,
 a `list[tuple[int, int, int]]` of zero-based vertex indices. Each `Vector`
 exposes `.X`, `.Y` and `.Z` and iterates as a three-element tuple. On the
 committed fixture
-[`packs/stub/fixtures/plate_2holes.step`](../packs/stub/fixtures/plate_2holes.step),
+[`packs/stub/fixtures/plate_2holes.step`](../../packs/stub/fixtures/plate_2holes.step),
 `tessellate(0.1)` returned 1036 vertices and 1028 triangles, with indices from 0
 to 1035, for a bounding box of 120 x 60 x 5 mm. `Shape.tessellate_with_uvs(...)`
 and `Shape.mesh(...)` also exist; neither is needed.
 
-**The agnosticism seam.** [`tools/agnostic_lint.py`](../tools/agnostic_lint.py)
+**The agnosticism seam.** [`tools/agnostic_lint.py`](../../tools/agnostic_lint.py)
 scans one directory only: `aturb/`, recursively, and only `*.py` files. Its
 pattern is a case-insensitive, word-boundary regular expression over nine
 backend brand and backend concept tokens, and it prints every matching line.
-`build123d` matches none of them, and `docs/` is not scanned at all. The four
+`build123d` matches none of them, and `docs/` is not scanned at all. The
 modules of `aturb/` that name `build123d` are all in the neutral verification
-layer: [`aturb/verify/step.py`](../aturb/verify/step.py),
-[`aturb/verify/holes.py`](../aturb/verify/holes.py),
-[`aturb/verify/cylinders.py`](../aturb/verify/cylinders.py) and
-[`aturb/verify/interference.py`](../aturb/verify/interference.py).
+layer: [`aturb/verify/step.py`](../../aturb/verify/step.py),
+[`aturb/verify/holes.py`](../../aturb/verify/holes.py),
+[`aturb/verify/cylinders.py`](../../aturb/verify/cylinders.py),
+[`aturb/verify/interference.py`](../../aturb/verify/interference.py),
+[`aturb/verify/engineering.py`](../../aturb/verify/engineering.py) and
+[`aturb/verify/assembly.py`](../../aturb/verify/assembly.py).
 
-**The size seam.** [`tools/size_limit.py`](../tools/size_limit.py) scans
+> **[Updated]** The record said **four** modules. The verified count today is
+> **six**: the engineering analysis and the assembly verification were added
+> after this record was written.
+
+**The size seam.** [`tools/size_limit.py`](../../tools/size_limit.py) scans
 `aturb`, `packs`, `tools`, `tests` and `clients`, and only `*.py` files.
 `clients/` is scanned, but `.html`, `.js` and `.css` files are not checked by
 the tool. The 300-line rule for the browser assets is therefore a rule of this
 phase, enforced by the card acceptance criteria, not by the tool.
 
-**The command-line budget.** [`aturb/cli.py`](../aturb/cli.py) is 295 lines: 295
+**The command-line budget.** [`aturb/cli.py`](../../aturb/cli.py) is 297 lines: 297
 newline characters and a trailing newline. The headroom below the 300-line
-limit is exactly 5 lines.
+limit is exactly 3 lines.
+
+> **[Updated]** The verified count today is **297 lines** and the headroom is
+> **three lines**. The count of 295 and the headroom of five lines were
+> correct when this record was written.
 
 **The manifest.** `result.toml` holds `status`, `part_id`, `stop_reason`,
 `attempts`, `input_tokens`, `output_tokens`, `cost_usd`, `prompt_version`,
@@ -88,12 +102,12 @@ code. The client imports the core. The core domain packages — `aturb/agent/`,
 `aturb/evals/`, `aturb/verify/`, `aturb/contract/` and `aturb/packs/` — never
 import `clients/`; the only import of the client inside the core is the lazy
 `from clients.viewer.cli import run_view_command` in the `view` branch of the
-top-level entry point [`aturb/cli.py`](../aturb/cli.py). The agnosticism lint
+top-level entry point [`aturb/cli.py`](../../aturb/cli.py). The agnosticism lint
 stays green because the core gains no new module and no new reference to a
 backend.
 
 **The tessellation seam is the verified one.** The client calls the core's
-[`load_step()`](../aturb/verify/step.py:90) and then the verified
+[`load_step()`](../../aturb/verify/step.py:90) and then the verified
 `model.shape.tessellate(tolerance, angular_tolerance)` call, and converts the
 returned `list[Vector]` and `list[tuple[int, int, int]]` into a JSON mesh of
 positions and triangle indices. The conversion happens on demand, at the viewer
@@ -116,7 +130,7 @@ viewer renders with no network at all. The trade-off is explicit: hand-written
 camera, matrix, shading and edge code is more work than importing a scene
 graph, and the feature set is smaller, but the viewer works offline, works from
 a plain copy of the folder, adds no dependency to
-[`pyproject.toml`](../pyproject.toml) and cannot break because a remote script
+[`pyproject.toml`](../../pyproject.toml) and cannot break because a remote script
 changed. The zero-dependency, offline-safe choice is locked.
 
 **The phase has two stages.** Stage 1 is a read-only live 3D viewer: it loads
@@ -124,8 +138,8 @@ any `aturb generate` workspace, serves it over loopback-only HTTP, and shows
 the geometry, the measured engineering facts and the artifact downloads. Stage 2
 adds a prompt panel that posts a natural-language requirement to a loopback-only
 endpoint, which calls the existing expectation-free
-[`generate_part()`](../aturb/agent/generate.py:68) and
-[`write_generate_manifest()`](../aturb/agent/generate_cli.py:32) into a fresh
+[`generate_part()`](../../aturb/agent/generate.py:68) and
+[`write_generate_manifest()`](../../aturb/agent/generate_cli.py:32) into a fresh
 timestamped workspace, and then updates the viewport and the panel. Stage 2
 never creates a task, an answer or an expectation, never scores anything and
 never shows a correctness claim.
@@ -169,7 +183,7 @@ git-ignored scratch folder, and names every file and what it shows. The
 repository keeps the written record, not the image binaries.
 
 **The command line spends exactly five lines.** T9.05 adds five lines to
-[`aturb/cli.py`](../aturb/cli.py) and lands it on exactly 300 lines:
+[`aturb/cli.py`](../../aturb/cli.py) and lands it on exactly 300 lines:
 
 1. `view = sub.add_parser("view")`
 2. `view.add_argument("workspace")`
@@ -180,18 +194,23 @@ repository keeps the written record, not the image binaries.
 The import is lazy and sits inside the dispatch branch, so `build`, `check` and
 `eval` never import the client package and their printed lines and exit codes
 are untouched. The branch sits immediately after the argument parsing and
-before the configuration block, because the `view` parser has no `--config`
-option and the client resolves the configuration itself. No `--port` option is
-added: the port is an environment setting, and adding a flag would cost a
-sixth line. The consequence is recorded plainly: after T9.05 the command line
-has **zero** remaining headroom, so any later command needs a new decision
-record or a line-saving refactor.
+before the configuration block. No `--port` option is added: the port is an
+environment setting, and adding a flag would cost a sixth line. The
+consequence is recorded plainly: after T9.05 the command line has **zero**
+remaining headroom, so any later command needs a new decision record or a
+line-saving refactor.
+
+> **[Updated]** Two statements above are no longer true. The `view` parser now
+> **does** take a `--config` option, and the command line is **297 lines**, not
+> 300, so the headroom is three lines. The `--config` flag of `view` is
+> threaded into all three viewer services; the decision is recorded in
+> [`docs/adr/0015-lazy-cli-startup-and-shared-safety.md`](0015-lazy-cli-startup-and-shared-safety.md).
 
 **The client is importable, and its assets ship with it.** In this checkout the
 editable install writes `_editable_impl_aturb.pth` with the repository root, and
 `clients/` is a namespace package, so `clients.viewer` is importable. For a
 built wheel, T9.05 adds `clients` to the wheel package list in
-[`pyproject.toml`](../pyproject.toml) and verifies that the static files under
+[`pyproject.toml`](../../pyproject.toml) and verifies that the static files under
 `clients/viewer/static/` — the page, the stylesheet and the scripts — are
 included as package data, because a wheel that carries the Python modules
 without the browser assets would serve a viewer with no page. That is a
@@ -222,8 +241,8 @@ have to re-derive them.
 
 The zero-dependency choice costs hand-written browser code and a smaller
 feature set, and it buys an offline viewer and an unchanged dependency list.
-The five-line budget costs a command-line flag and leaves the command line
-full, and it buys a core that stays free of interface code.
+The five-line budget costs a command-line command and leaves the command line
+nearly full, and it buys a core that stays free of interface code.
 
 The loopback-only, workspace-contained server is a local single-user tool. It
 has no authentication, no multi-user hosting and no cloud deployment, and it
